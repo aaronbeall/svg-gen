@@ -53,18 +53,20 @@ const star = defineGeometry<StarScope>()({
   }
 });
 
-// Render and output
-const result = render(star);
+// Output helper
+const outputDir = 'output';
+if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
 
-console.log('=== SVG Source ===');
-console.log(result.svg);
-console.log('\n=== Writing output files ===');
+function output(name: string, geometry: Parameters<typeof render>[0]) {
+  const result = render(geometry);
+  console.log(`\n=== ${name} ===`);
+  console.log(result.svg);
+  fs.writeFileSync(`${outputDir}/${name}.svg`, result.svg);
+  fs.writeFileSync(`${outputDir}/${name}.html`, result.html);
+  console.log(`Written: ${outputDir}/${name}.svg, ${outputDir}/${name}.html`);
+}
 
-fs.writeFileSync('output.svg', result.svg);
-fs.writeFileSync('output.html', result.html);
-
-console.log('Written: output.svg');
-console.log('Written: output.html');
+output('star', star);
 
 // ============================================================================
 // Additional Examples
@@ -92,8 +94,7 @@ const circleExample = defineGeometry<CircleScope>()({
   }
 });
 
-console.log('\n=== Circle Example ===');
-console.log(render(circleExample).svg);
+output('circle', circleExample);
 
 // Hexagon example using polygon
 type HexScope = { cx: number; cy: number; r: number; sides: number };
@@ -129,5 +130,4 @@ const hexagon = defineGeometry<HexScope>()({
   }
 });
 
-console.log('\n=== Hexagon Example ===');
-console.log(render(hexagon).svg);
+output('hexagon', hexagon);
