@@ -1,4 +1,81 @@
-import type { Geometry, LetBlock, ForLoop, PathData, CircleData, RectData, LineData, PolylineData, PolygonData } from './types.js';
+import type { SvgDef, LetBlock, ForLoop, PathData, CircleData, RectData, LineData, PolylineData, PolygonData } from './types.js';
+
+// ============================================================================
+// Evaluated AST Types
+// ============================================================================
+
+export interface EvalPoint {
+  x: number;
+  y: number;
+}
+
+export interface EvalPath {
+  type: 'path';
+  points: EvalPoint[];
+  close: boolean;
+  d: string;
+}
+
+export interface EvalCircle {
+  type: 'circle';
+  cx: number;
+  cy: number;
+  r: number;
+  fill: string;
+  stroke: string;
+  strokeWidth: number;
+}
+
+export interface EvalRect {
+  type: 'rect';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  fill: string;
+  stroke: string;
+  strokeWidth: number;
+}
+
+export interface EvalLine {
+  type: 'line';
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  stroke: string;
+  strokeWidth: number;
+}
+
+export interface EvalPolyline {
+  type: 'polyline';
+  points: EvalPoint[];
+  fill: string;
+  stroke: string;
+  strokeWidth: number;
+}
+
+export interface EvalPolygon {
+  type: 'polygon';
+  points: EvalPoint[];
+  fill: string;
+  stroke: string;
+  strokeWidth: number;
+}
+
+export interface EvalGroup {
+  type: 'group';
+  transform: string | null;
+  children: EvalElement[];
+}
+
+export type EvalElement = EvalPath | EvalCircle | EvalRect | EvalLine | EvalPolyline | EvalPolygon | EvalGroup;
+
+export interface EvalSvg {
+  width: number;
+  height: number;
+  elements: EvalElement[];
+}
 
 // ============================================================================
 // Scope Evaluation
@@ -23,25 +100,23 @@ function createScope(letBlock: LetBlock | undefined, parentScope: Record<string,
     get(target, prop: string) {
       // Return from cache if already evaluated
       if (prop in evaluated) return evaluated[prop];
-      
+
       // Check parent scope first
       if (!(prop in target) && prop in parentScope) {
         return parentScope[prop];
       }
 
       const value = target[prop];
-      
+
       // If it's a function, evaluate it
       if (typeof value === 'function') {
-        if (evaluating.has(prop)) {
-          throw new Error(`Circular reference detected: ${prop}`);
-        }
+        if (evaluating.has(prop)) throw new Error(`Circular reference detected: ${prop}`);
         evaluating.add(prop);
         evaluated[prop] = value(scope);
         evaluating.delete(prop);
         return evaluated[prop];
       }
-      
+
       // Static value
       evaluated[prop] = value;
       return value;
@@ -58,29 +133,21 @@ function createScope(letBlock: LetBlock | undefined, parentScope: Record<string,
 
 /** Evaluate an expression with a scope */
 function evalExpr<T>(expr: T | ((scope: any) => T), scope: Record<string, ScopeValue>): T {
-  if (typeof expr === 'function') {
-    return (expr as (s: any) => T)(scope);
-  }
+  if (typeof expr === 'function') return (expr as (s: any) => T)(scope);
   return expr;
 }
 
 // ============================================================================
-// Point Generation
+// Evaluation (DSL -> EvalAST)
 // ============================================================================
 
-interface Point {
-  x: number;
-  y: number;
-}
-
-function evalForLoop(forLoop: ForLoop, parentScope: Record<string, ScopeValue>): Point[] {
-  const points: Point[] = [];
+function evalForLoop(forLoop: ForLoop, parentScope: Record<string, ScopeValue>): EvalPoint[] {
+  const points: EvalPoint[] = [];
   const start = forLoop.i;
 
   for (let i = start; ; i++) {
     // Create loop scope with i
     const loopScope = createScope({ i }, parentScope);
-    
     const to = evalExpr(forLoop.to, loopScope);
     if (i >= to) break;
 
@@ -89,169 +156,114 @@ function evalForLoop(forLoop: ForLoop, parentScope: Record<string, ScopeValue>):
 
     // Evaluate point
     const [xExpr, yExpr] = forLoop.point;
-    const x = evalExpr(xExpr, innerScope);
-    const y = evalExpr(yExpr, innerScope);
-    points.push({ x, y });
+    points.push({ x: evalExpr(xExpr, innerScope), y: evalExpr(yExpr, innerScope) });
   }
 
   return points;
 }
 
-// ============================================================================
-// SVG Generation
-// ============================================================================
-
-function pointsToPathD(points: Point[], close: boolean): string {
+function pointsToPathD(points: EvalPoint[], close: boolean): string {
   if (points.length === 0) return '';
   const commands = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(2)},${p.y.toFixed(2)}`);
   if (close) commands.push('Z');
   return commands.join(' ');
 }
 
-function pointsToAttr(points: Point[]): string {
-  return points.map(p => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ');
+function evalPath(data: PathData, scope: Record<string, ScopeValue>): EvalPath {
+  const points = data.for ? evalForLoop(data.for, scope) : [];
+  const close = data.close ?? false;
+  const d = pointsToPathD(points, close);
+  return { type: 'path', points, close, d };
 }
 
-function generatePath(pathData: PathData, scope: Record<string, ScopeValue>): string {
-  let points: Point[] = [];
-  if (pathData.for) {
-    points = evalForLoop(pathData.for, scope);
-  }
-  const d = pointsToPathD(points, pathData.close ?? false);
-  return `  <path d="${d}" fill="none" stroke="black" stroke-width="2"/>`;
-}
-
-function generateCircle(data: CircleData, scope: Record<string, ScopeValue>): string {
-  const cx = evalExpr(data.cx, scope);
-  const cy = evalExpr(data.cy, scope);
-  const r = evalExpr(data.r, scope);
-  const fill = data.fill ? evalExpr(data.fill, scope) : 'none';
-  const stroke = data.stroke ? evalExpr(data.stroke, scope) : 'black';
-  const strokeWidth = data.strokeWidth ? evalExpr(data.strokeWidth, scope) : 1;
-  return `  <circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
-}
-
-function generateRect(data: RectData, scope: Record<string, ScopeValue>): string {
-  const x = evalExpr(data.x, scope);
-  const y = evalExpr(data.y, scope);
-  const width = evalExpr(data.width, scope);
-  const height = evalExpr(data.height, scope);
-  const fill = data.fill ? evalExpr(data.fill, scope) : 'none';
-  const stroke = data.stroke ? evalExpr(data.stroke, scope) : 'black';
-  const strokeWidth = data.strokeWidth ? evalExpr(data.strokeWidth, scope) : 1;
-  return `  <rect x="${x}" y="${y}" width="${width}" height="${height}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
-}
-
-function generateLine(data: LineData, scope: Record<string, ScopeValue>): string {
-  const x1 = evalExpr(data.x1, scope);
-  const y1 = evalExpr(data.y1, scope);
-  const x2 = evalExpr(data.x2, scope);
-  const y2 = evalExpr(data.y2, scope);
-  const stroke = data.stroke ? evalExpr(data.stroke, scope) : 'black';
-  const strokeWidth = data.strokeWidth ? evalExpr(data.strokeWidth, scope) : 1;
-  return `  <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
-}
-
-function generatePolyline(data: PolylineData, scope: Record<string, ScopeValue>): string {
-  let points: Point[] = [];
-  if (data.for) {
-    points = evalForLoop(data.for, scope);
-  }
-  const pointsAttr = pointsToAttr(points);
-  const fill = data.fill ? evalExpr(data.fill, scope) : 'none';
-  const stroke = data.stroke ? evalExpr(data.stroke, scope) : 'black';
-  const strokeWidth = data.strokeWidth ? evalExpr(data.strokeWidth, scope) : 1;
-  return `  <polyline points="${pointsAttr}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
-}
-
-function generatePolygon(data: PolygonData, scope: Record<string, ScopeValue>): string {
-  let points: Point[] = [];
-  if (data.for) {
-    points = evalForLoop(data.for, scope);
-  }
-  const pointsAttr = pointsToAttr(points);
-  const fill = data.fill ? evalExpr(data.fill, scope) : 'none';
-  const stroke = data.stroke ? evalExpr(data.stroke, scope) : 'black';
-  const strokeWidth = data.strokeWidth ? evalExpr(data.strokeWidth, scope) : 1;
-  return `  <polygon points="${pointsAttr}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}"/>`;
-}
-
-// ============================================================================
-// Main Render Function
-// ============================================================================
-
-export interface RenderResult {
-  svg: string;
-  html: string;
-}
-
-export function render(geometry: Geometry): RenderResult {
-  const { svg } = geometry;
-  const [width, height] = svg.size;
-
-  // Create scope from let block
-  const scope = createScope(svg.let);
-
-  // Helper to normalize single item or array to array
-  const toArray = <T>(item: T | T[] | undefined): T[] => {
-    if (!item) return [];
-    return Array.isArray(item) ? item : [item];
+function evalCircle(data: CircleData, scope: Record<string, ScopeValue>): EvalCircle {
+  return {
+    type: 'circle',
+    cx: evalExpr(data.cx, scope),
+    cy: evalExpr(data.cy, scope),
+    r: evalExpr(data.r, scope),
+    fill: data.fill ? evalExpr(data.fill, scope) : 'none',
+    stroke: data.stroke ? evalExpr(data.stroke, scope) : 'black',
+    strokeWidth: data.strokeWidth ? evalExpr(data.strokeWidth, scope) : 1
   };
+}
 
-  // Generate SVG elements
-  const elements: string[] = [];
+function evalRect(data: RectData, scope: Record<string, ScopeValue>): EvalRect {
+  return {
+    type: 'rect',
+    x: evalExpr(data.x, scope),
+    y: evalExpr(data.y, scope),
+    width: evalExpr(data.width, scope),
+    height: evalExpr(data.height, scope),
+    fill: data.fill ? evalExpr(data.fill, scope) : 'none',
+    stroke: data.stroke ? evalExpr(data.stroke, scope) : 'black',
+    strokeWidth: data.strokeWidth ? evalExpr(data.strokeWidth, scope) : 1
+  };
+}
 
-  for (const p of toArray(svg.path)) elements.push(generatePath(p, scope));
-  for (const c of toArray(svg.circle)) elements.push(generateCircle(c, scope));
-  for (const r of toArray(svg.rect)) elements.push(generateRect(r, scope));
-  for (const l of toArray(svg.line)) elements.push(generateLine(l, scope));
-  for (const pl of toArray(svg.polyline)) elements.push(generatePolyline(pl, scope));
-  for (const pg of toArray(svg.polygon)) elements.push(generatePolygon(pg, scope));
+function evalLine(data: LineData, scope: Record<string, ScopeValue>): EvalLine {
+  return {
+    type: 'line',
+    x1: evalExpr(data.x1, scope),
+    y1: evalExpr(data.y1, scope),
+    x2: evalExpr(data.x2, scope),
+    y2: evalExpr(data.y2, scope),
+    stroke: data.stroke ? evalExpr(data.stroke, scope) : 'black',
+    strokeWidth: data.strokeWidth ? evalExpr(data.strokeWidth, scope) : 1
+  };
+}
+
+function evalPolyline(data: PolylineData, scope: Record<string, ScopeValue>): EvalPolyline {
+  return {
+    type: 'polyline',
+    points: data.for ? evalForLoop(data.for, scope) : [],
+    fill: data.fill ? evalExpr(data.fill, scope) : 'none',
+    stroke: data.stroke ? evalExpr(data.stroke, scope) : 'black',
+    strokeWidth: data.strokeWidth ? evalExpr(data.strokeWidth, scope) : 1
+  };
+}
+
+function evalPolygon(data: PolygonData, scope: Record<string, ScopeValue>): EvalPolygon {
+  return {
+    type: 'polygon',
+    points: data.for ? evalForLoop(data.for, scope) : [],
+    fill: data.fill ? evalExpr(data.fill, scope) : 'none',
+    stroke: data.stroke ? evalExpr(data.stroke, scope) : 'black',
+    strokeWidth: data.strokeWidth ? evalExpr(data.strokeWidth, scope) : 1
+  };
+}
+
+function toArray<T>(item: T | T[] | undefined): T[] {
+  if (!item) return [];
+  return Array.isArray(item) ? item : [item];
+}
+
+export function evaluate(svg: SvgDef): EvalSvg {
+  const [width, height] = svg.size;
+  const scope = createScope(svg.let);
+  const elements: EvalElement[] = [];
+
+  for (const p of toArray(svg.path)) elements.push(evalPath(p, scope));
+  for (const c of toArray(svg.circle)) elements.push(evalCircle(c, scope));
+  for (const r of toArray(svg.rect)) elements.push(evalRect(r, scope));
+  for (const l of toArray(svg.line)) elements.push(evalLine(l, scope));
+  for (const pl of toArray(svg.polyline)) elements.push(evalPolyline(pl, scope));
+  for (const pg of toArray(svg.polygon)) elements.push(evalPolygon(pg, scope));
 
   if (svg.group) {
     for (const groupData of svg.group) {
-      const groupElements: string[] = [];
-      const transform = groupData.transform ? evalExpr(groupData.transform, scope) : null;
-      if (groupData.path) groupElements.push(generatePath(groupData.path, scope));
-      if (groupData.circle) groupElements.push(generateCircle(groupData.circle, scope));
-      if (groupData.rect) groupElements.push(generateRect(groupData.rect, scope));
-      if (groupData.line) groupElements.push(generateLine(groupData.line, scope));
-      const transformAttr = transform ? ` transform="${transform}"` : '';
-      elements.push(`  <g${transformAttr}>\n  ${groupElements.join('\n  ')}\n  </g>`);
+      const children: EvalElement[] = [];
+      if (groupData.path) children.push(evalPath(groupData.path, scope));
+      if (groupData.circle) children.push(evalCircle(groupData.circle, scope));
+      if (groupData.rect) children.push(evalRect(groupData.rect, scope));
+      if (groupData.line) children.push(evalLine(groupData.line, scope));
+      elements.push({
+        type: 'group',
+        transform: groupData.transform ? evalExpr(groupData.transform, scope) : null,
+        children
+      });
     }
   }
 
-  const svgContent = elements.join('\n');
-  const svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-${svgContent}
-</svg>`;
-
-  const html = `<!DOCTYPE html>
-<html>
-<head>
-  <title>SVG Output</title>
-  <style>
-    body { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background: #f0f0f0; font-family: system-ui, sans-serif; }
-    .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin: 20px; }
-    h2 { margin-top: 0; color: #333; }
-    pre { background: #1e1e1e; color: #d4d4d4; padding: 16px; border-radius: 4px; overflow-x: auto; font-size: 12px; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h2>Rendered SVG</h2>
-    ${svgString}
-  </div>
-  <div class="container">
-    <h2>SVG Source</h2>
-    <pre>${escapeHtml(svgString)}</pre>
-  </div>
-</body>
-</html>`;
-
-  return { svg: svgString, html };
-}
-
-function escapeHtml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return { width, height, elements };
 }

@@ -88,28 +88,8 @@ export interface GroupData {
 /** Single item or array of items */
 type OneOrMany<T> = T | T[];
 
-export interface SvgDef {
-  size: [number, number];
-  let?: LetBlock;
-  path?: OneOrMany<PathData>;
-  circle?: OneOrMany<CircleData>;
-  rect?: OneOrMany<RectData>;
-  line?: OneOrMany<LineData>;
-  polyline?: OneOrMany<PolylineData>;
-  polygon?: OneOrMany<PolygonData>;
-  group?: GroupData[];
-}
-
-export interface Geometry {
-  svg: SvgDef;
-}
-
-// ============================================================================
-// Builder
-// ============================================================================
-
 /**
- * Creates an SVG geometry definition.
+ * SVG definition - the main input type for rendering.
  *
  * The `let` block defines scope variables. Values can be:
  * - Static: `cx: 100`
@@ -119,7 +99,7 @@ export interface Geometry {
  * The evaluator resolves these in order, accumulating the scope.
  *
  * @example
- * const star = svg({
+ * const star: SvgDef = {
  *   size: [200, 200],
  *   let: {
  *     cx: 100,
@@ -143,8 +123,16 @@ export interface Geometry {
  *     },
  *     close: true
  *   }
- * });
+ * };
  */
-export function svg(def: SvgDef): Geometry {
-  return { svg: def };
+export interface SvgDef {
+  size: [number, number];
+  let?: LetBlock;
+  path?: OneOrMany<PathData>;
+  circle?: OneOrMany<CircleData>;
+  rect?: OneOrMany<RectData>;
+  line?: OneOrMany<LineData>;
+  polyline?: OneOrMany<PolylineData>;
+  polygon?: OneOrMany<PolygonData>;
+  group?: GroupData[];
 }

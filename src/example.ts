@@ -1,4 +1,4 @@
-import { svg, render } from './index.js';
+import { render, type SvgDef } from './index.js';
 import * as fs from 'fs';
 
 // ============================================================================
@@ -7,7 +7,7 @@ import * as fs from 'fs';
 // The evaluator resolves expressions via getters, so $.step just works
 // ============================================================================
 
-const star = svg({
+const star: SvgDef = {
   size: [200, 200],
 
   let: {
@@ -38,7 +38,7 @@ const star = svg({
 
     close: true
   }
-});
+};
 
 // Output helper
 const outputDir = 'output';
@@ -47,9 +47,9 @@ if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
 function output(name: string, geometry: Parameters<typeof render>[0]) {
   const result = render(geometry);
   console.log(`\n=== ${name} ===`);
-  console.log(result.svg);
-  fs.writeFileSync(`${outputDir}/${name}.svg`, result.svg);
-  fs.writeFileSync(`${outputDir}/${name}.html`, result.html);
+  console.log(result.svgString());
+  fs.writeFileSync(`${outputDir}/${name}.svg`, result.svgString());
+  fs.writeFileSync(`${outputDir}/${name}.html`, result.html());
   console.log(`Written: ${outputDir}/${name}.svg, ${outputDir}/${name}.html`);
 }
 
@@ -60,7 +60,7 @@ output('star', star);
 // ============================================================================
 
 // Circle example
-const circleExample = svg({
+const circleExample: SvgDef = {
   size: [100, 100],
 
   let: {
@@ -77,12 +77,12 @@ const circleExample = svg({
     stroke: 'navy',
     strokeWidth: 2
   }
-});
+};
 
 output('circle', circleExample);
 
 // Hexagon example using polygon
-const hexagon = svg({
+const hexagon: SvgDef = {
   size: [200, 200],
 
   let: {
@@ -110,6 +110,6 @@ const hexagon = svg({
     stroke: 'darkgoldenrod',
     strokeWidth: 3
   }
-});
+};
 
 output('hexagon', hexagon);
