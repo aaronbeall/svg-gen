@@ -439,24 +439,33 @@ function collectPointIterator(data: PathData | PolylineData | PolygonData, scope
   return [...iterator];
 }
 
-/** Get shape iterator from data with IteratorProps */
-function getShapeIterator(data: ShapeIteratorProps, scope: Record<string, ScopeValue>): Generator<IteratorStep> | null {
-  if (data.for) return iterateFor(data.for, scope);
-  if (data.spiral) return iterateSpiral(data.spiral, scope);
-  if (data.lissajous) return iterateLissajous(data.lissajous, scope);
-  if (data.rose) return iterateRose(data.rose, scope);
-  if (data.parametric) return iterateParametric(data.parametric, scope);
-  return null;
+/** Iterator with its output shapes */
+interface IteratorWithOutput {
+  iterator: Generator<IteratorStep>;
+  output: AnyShapeOutput;
 }
 
-/** Get shape output from a shape iterator */
-function getShapeOutput(data: ShapeIteratorProps): AnyShapeOutput | null {
-  if (data.for) return data.for as AnyShapeOutput;
-  if (data.spiral) return data.spiral as AnyShapeOutput;
-  if (data.lissajous) return data.lissajous as AnyShapeOutput;
-  if (data.rose) return data.rose as AnyShapeOutput;
-  if (data.parametric) return data.parametric as AnyShapeOutput;
-  return null;
+/** Get all shape iterators from data with ShapeIteratorProps */
+function getShapeIterators(data: ShapeIteratorProps, scope: Record<string, ScopeValue>): IteratorWithOutput[] {
+  const result: IteratorWithOutput[] = [];
+  if (data.for) result.push({ iterator: iterateFor(data.for, scope), output: data.for as AnyShapeOutput });
+  if (data.spiral) result.push({ iterator: iterateSpiral(data.spiral, scope), output: data.spiral as AnyShapeOutput });
+  if (data.lissajous) result.push({ iterator: iterateLissajous(data.lissajous, scope), output: data.lissajous as AnyShapeOutput });
+  if (data.rose) result.push({ iterator: iterateRose(data.rose, scope), output: data.rose as AnyShapeOutput });
+  if (data.parametric) result.push({ iterator: iterateParametric(data.parametric, scope), output: data.parametric as AnyShapeOutput });
+  return result;
+}
+
+/** Evaluate all shape iterators, producing elements for each step */
+function evalShapeIterators(iterators: IteratorWithOutput[], baseScope: Record<string, ScopeValue>): EvalElement[] {
+  const elements: EvalElement[] = [];
+  for (const { iterator, output } of iterators) {
+    for (const step of iterator) {
+      const stepScope = { ...baseScope, ...step };
+      elements.push(...evalIteratorShapes(output, stepScope));
+    }
+  }
+  return elements;
 }
 
 // ============================================================================
@@ -502,60 +511,48 @@ function evalIteratorShapes(output: ShapeOutput, scope: Record<string, ScopeValu
   for (const p of toArray(output.path)) elements.push(evalPath(p, scope));
   for (const pl of toArray(output.polyline)) elements.push(evalPolyline(pl, scope));
   for (const pg of toArray(output.polygon)) elements.push(evalPolygon(pg, scope));
-  for (const g of toArray(output.group)) pushElements(elements, evalGroup(g, scope));
+  for (const g of toArray(output.group)) elements.push(evalGroup(g, scope));
   return elements;
 }
 
-/** Evaluate a group, handling shape iterators */
-function evalGroup(groupData: GroupData, parentScope: Record<string, ScopeValue>): EvalGroup | EvalElement[] {
+/** Evaluate a group, handling both static shapes and shape iterators */
+function evalGroup(groupData: GroupData, parentScope: Record<string, ScopeValue>): EvalGroup {
   const groupScope = groupData.let ? createScope(groupData.let, parentScope) : parentScope;
-  const iterator = getShapeIterator(groupData, groupScope);
-  const shapeOutput = getShapeOutput(groupData);
+  
+  // Evaluate static shapes
+  const children = evalGenerators(groupData, groupScope);
 
-  if (!iterator || !shapeOutput) {
-    // No iterator - single group with static shapes
-    const children = evalGenerators(groupData, groupScope);
-
-    // Recursively evaluate nested groups
-    for (const nestedGroup of toArray(groupData.group)) {
-      pushElements(children, evalGroup(nestedGroup, groupScope));
-    }
-
-    return {
-      type: 'group',
-      transform: groupData.transform ? evalExpr(groupData.transform, groupScope) : null,
-      children
-    };
+  // Recursively evaluate nested groups
+  for (const nestedGroup of toArray(groupData.group)) {
+    children.push(evalGroup(nestedGroup, groupScope));
   }
 
-  // With iterator - produce shapes at each step
-  const elements: EvalElement[] = [];
-  for (const step of iterator) {
-    const stepScope = { ...groupScope, ...step };
-    elements.push(...evalIteratorShapes(shapeOutput, stepScope));
-  }
-  return elements;
+  // Evaluate all shape iterators
+  const iterators = getShapeIterators(groupData, groupScope);
+  children.push(...evalShapeIterators(iterators, groupScope));
+
+  return {
+    type: 'group',
+    transform: groupData.transform ? evalExpr(groupData.transform, groupScope) : null,
+    children
+  };
 }
 
 export function evaluate(svg: SvgDef): EvalSvg {
   const [width, height] = svg.size;
   const scope = createScope(svg.let);
+  
+  // Evaluate static shapes
   const elements: EvalElement[] = evalGenerators(svg, scope);
 
   // Handle groups
   for (const groupData of toArray(svg.group)) {
-    pushElements(elements, evalGroup(groupData, scope));
+    elements.push(evalGroup(groupData, scope));
   }
 
-  // Handle iterators at SvgDef level
-  const iterator = getShapeIterator(svg, scope);
-  const shapeOutput = getShapeOutput(svg);
-  if (iterator && shapeOutput) {
-    for (const step of iterator) {
-      const stepScope = { ...scope, ...step };
-      elements.push(...evalIteratorShapes(shapeOutput, stepScope));
-    }
-  }
+  // Handle all iterators at SvgDef level
+  const iterators = getShapeIterators(svg, scope);
+  elements.push(...evalShapeIterators(iterators, scope));
 
   return { width, height, elements };
 }

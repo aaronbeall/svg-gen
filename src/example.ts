@@ -263,6 +263,27 @@ const groupIterator: SvgDef = {
       stroke: 'black',
       strokeWidth: 2
     },
+    circle: {
+      cx: $ => $.cx,
+      cy: $ => $.cy,
+      r: 8,
+      fill: 'coral',
+      stroke: 'darkred'
+    },
+    for: {
+      i: 0,
+      to: 20,
+      let: {
+        r: $ => 8 + $.i * 2
+      },
+      circle: {
+        cx: $ => $.cx,
+        cy: $ => $.cy,
+        r: $ => $.r,
+        fill: 'coral',
+        stroke: 'darkred'
+      }
+    },
     spiral: {
       cx: $ => $.cx,
       cy: $ => $.cy,
