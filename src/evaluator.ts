@@ -1,8 +1,12 @@
 import type {
   SvgDef, LetBlock, PathData, CircleData, RectData, LineData, PolylineData, PolygonData, GroupData,
   ForIterator, SpiralIterator, LissajousIterator, RoseIterator, ParametricIterator,
-  ShapeOutput, ShapeIteratorProps
+  ShapeOutput, ShapeIteratorProps, Scope
 } from './types.js';
+
+// Runtime types - evaluator uses base Scope for runtime flexibility
+type AnyLetBlock = LetBlock<Scope>;
+type AnyShapeOutput = ShapeOutput<Scope>;
 
 // ============================================================================
 // Evaluated AST Types
@@ -301,7 +305,7 @@ function* iterateFor(forLoop: ForIterator, parentScope: Record<string, ScopeValu
     const to = evalExpr(forLoop.to, loopScope);
     if (i >= to) break;
 
-    const innerScope = forLoop.let ? createScope(forLoop.let, loopScope) : loopScope;
+    const innerScope = forLoop.let ? createScope(forLoop.let as AnyLetBlock, loopScope) : loopScope;
     const t = total > 1 ? (i - start) / (total - 1) : 0;
 
     // For loop doesn't provide x, y - those come from shape's point expression
@@ -344,7 +348,7 @@ function* iterateSpiral(data: SpiralIterator, parentScope: Record<string, ScopeV
     }
 
     const stepScope = { x: cx + r * Math.cos(theta), y: cy + r * Math.sin(theta), i, t, theta, r };
-    const innerScope = data.let ? createScope(data.let, { ...parentScope, ...stepScope }) : stepScope;
+    const innerScope = data.let ? createScope(data.let as AnyLetBlock, { ...parentScope, ...stepScope }) : stepScope;
     yield { ...stepScope, ...innerScope };
   }
 }
@@ -369,7 +373,7 @@ function* iterateLissajous(data: LissajousIterator, parentScope: Record<string, 
       y: cy + ay * Math.sin(fy * t),
       i, t
     };
-    const innerScope = data.let ? createScope(data.let, { ...parentScope, ...stepScope }) : stepScope;
+    const innerScope = data.let ? createScope(data.let as AnyLetBlock, { ...parentScope, ...stepScope }) : stepScope;
     yield { ...stepScope, ...innerScope };
   }
 }
@@ -393,7 +397,7 @@ function* iterateRose(data: RoseIterator, parentScope: Record<string, ScopeValue
       y: cy + r * Math.sin(theta),
       i, t, theta, r
     };
-    const innerScope = data.let ? createScope(data.let, { ...parentScope, ...stepScope }) : stepScope;
+    const innerScope = data.let ? createScope(data.let as AnyLetBlock, { ...parentScope, ...stepScope }) : stepScope;
     yield { ...stepScope, ...innerScope };
   }
 }
@@ -413,7 +417,7 @@ function* iterateParametric(data: ParametricIterator, parentScope: Record<string
       y: data.y(paramScope),
       i, t
     };
-    const innerScope = data.let ? createScope(data.let, { ...parentScope, ...stepScope }) : stepScope;
+    const innerScope = data.let ? createScope(data.let as AnyLetBlock, { ...parentScope, ...stepScope }) : stepScope;
     yield { ...stepScope, ...innerScope };
   }
 }
@@ -446,12 +450,12 @@ function getShapeIterator(data: ShapeIteratorProps, scope: Record<string, ScopeV
 }
 
 /** Get shape output from a shape iterator */
-function getShapeOutput(data: ShapeIteratorProps): ShapeOutput | null {
-  if (data.for) return data.for;
-  if (data.spiral) return data.spiral;
-  if (data.lissajous) return data.lissajous;
-  if (data.rose) return data.rose;
-  if (data.parametric) return data.parametric;
+function getShapeOutput(data: ShapeIteratorProps): AnyShapeOutput | null {
+  if (data.for) return data.for as AnyShapeOutput;
+  if (data.spiral) return data.spiral as AnyShapeOutput;
+  if (data.lissajous) return data.lissajous as AnyShapeOutput;
+  if (data.rose) return data.rose as AnyShapeOutput;
+  if (data.parametric) return data.parametric as AnyShapeOutput;
   return null;
 }
 

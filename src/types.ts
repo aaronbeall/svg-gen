@@ -8,12 +8,12 @@ export interface Scope {
 }
 
 /** Expression: either a static value or a function of scope */
-export type Expr<T> = T | (($: Scope) => T);
+export type Expr<T, S extends Scope = Scope> = T | (($: S) => T);
 
 /** A let block: static values or expressions */
-export interface LetBlock {
-  [key: string]: Expr<number | string | boolean>;
-}
+export type LetBlock<S extends Scope = Scope> = {
+  [key: string]: Expr<number | string | boolean, S>;
+};
 
 // ============================================================================
 // Modifiers (transform points)
@@ -136,42 +136,44 @@ export interface StyleProps {
 // ============================================================================
 
 /** Properties for scope creation - shared by iterators, groups, and SvgDef */
-export interface ScopeProps {
+export interface ScopeProps<S extends Scope = Scope> {
   /** Scope variables */
-  let?: LetBlock;
+  let?: LetBlock<S>;
 }
+
+// ============================================================================
+// Iterator Scope Types
+// ============================================================================
+
+/** For iterator provides i, t */
+export type ForIteratorScope = Scope & { i: number; t: number };
+
+/** Spiral iterator provides x, y, t, theta, r, i */
+export type SpiralIteratorScope = Scope & { x: number; y: number; t: number; theta: number; r: number; i: number };
+
+/** Lissajous iterator provides x, y, t, i */
+export type LissajousIteratorScope = Scope & { x: number; y: number; t: number; i: number };
+
+/** Rose iterator provides x, y, theta, r, i */
+export type RoseIteratorScope = Scope & { x: number; y: number; theta: number; r: number; i: number };
+
+/** Parametric iterator provides x, y, t, i */
+export type ParametricIteratorScope = Scope & { x: number; y: number; t: number; i: number };
 
 // ============================================================================
 // Iterator Types (provide scope variables at each step)
 // ============================================================================
 
-/** Common properties for iterators */
-export interface IteratorBaseProps extends ScopeProps {
-  /** Iterator scope variables */
-  $?: string[];
-}
-
-/** Iterator scope */
-export type IteratorScope<T extends IteratorBaseProps> = Scope & {
-  // declare the iterator variables as properties
-  [key in NonNullable<T['$']>[number]]: number;
-}
-
 /** For loop iterator - provides i, t in scope */
-export interface ForIterator extends IteratorBaseProps {
+export interface ForIterator extends ScopeProps<ForIteratorScope> {
   /** Starting index */
   i: number;
   /** End index (exclusive) */
   to: Expr<number>;
-  /** Iterator scope variables */
-  $?: ['i', 't'];
 }
 
-/** For iterator scope */
-export type ForIteratorScope = IteratorScope<ForIterator>;
-
 /** Spiral iterator - provides x, y, t, theta, r, i in scope */
-export interface SpiralIterator extends IteratorBaseProps {
+export interface SpiralIterator extends ScopeProps<SpiralIteratorScope> {
   cx: Expr<number>;
   cy: Expr<number>;
   startRadius: Expr<number>;
@@ -179,15 +181,10 @@ export interface SpiralIterator extends IteratorBaseProps {
   turns: Expr<number>;
   type?: Expr<'archimedean' | 'logarithmic' | 'fermat'>;
   samples?: Expr<number>;
-  /** Iterator scope variables */
-  $?: ['x', 'y', 't', 'theta', 'r', 'i'];
 }
 
-/** Spiral iterator scope */
-export type SpiralIteratorScope = IteratorScope<SpiralIterator>;
-
 /** Lissajous iterator - provides x, y, t, i in scope */
-export interface LissajousIterator extends IteratorBaseProps {
+export interface LissajousIterator extends ScopeProps<LissajousIteratorScope> {
   cx: Expr<number>;
   cy: Expr<number>;
   ax: Expr<number>;
@@ -196,60 +193,45 @@ export interface LissajousIterator extends IteratorBaseProps {
   fy: Expr<number>;
   delta?: Expr<number>;
   samples?: Expr<number>;
-  /** Iterator scope variables */
-  $?: ['x', 'y', 't', 'i'];
 }
 
-/** Lissajous iterator scope */
-export type LissajousIteratorScope = IteratorScope<LissajousIterator>;
-
 /** Rose iterator - provides x, y, theta, r, i in scope */
-export interface RoseIterator extends IteratorBaseProps {
+export interface RoseIterator extends ScopeProps<RoseIteratorScope> {
   cx: Expr<number>;
   cy: Expr<number>;
   r: Expr<number>;
   k: Expr<number>;
   samples?: Expr<number>;
-  /** Iterator scope variables */
-  $?: ['x', 'y', 'theta', 'r', 'i'];
 }
 
-/** Rose iterator scope */
-export type RoseIteratorScope = IteratorScope<RoseIterator>;
-
 /** Parametric iterator - provides x, y, t, i in scope */
-export interface ParametricIterator extends IteratorBaseProps {
+export interface ParametricIterator extends ScopeProps<ParametricIteratorScope> {
   x: ($: Scope & { t: number }) => number;
   y: ($: Scope & { t: number }) => number;
   t: [Expr<number>, Expr<number>];
   samples?: Expr<number>;
-  /** Iterator scope variables */
-  $?: ['x', 'y', 't', 'i'];
 }
-
-/** Parametric iterator scope */
-export type ParametricIteratorScope = IteratorScope<ParametricIterator>;
 
 // ============================================================================
 // Iterator Output Types (what iterators produce)
 // ============================================================================
 
 /** Point output for point-based shapes */
-export interface PointOutput {
+export interface PointOutput<S extends Scope = Scope> {
   /** Point(s) to produce at each step (default is [$.x, $.y] when available, e.g. with curve iterators) */
-  point?: OneOrMany<[Expr<number>, Expr<number>]>;
+  point?: OneOrMany<[Expr<number, S>, Expr<number, S>]>;
 }
 
 /** Shape output for iterators and groups */
-export interface ShapeOutput {
+export interface ShapeOutput<S extends Scope = Scope> {
   // Basic primitives
-  circle?: OneOrMany<CircleData>;
-  rect?: OneOrMany<RectData>;
-  line?: OneOrMany<LineData>;
+  circle?: OneOrMany<CircleData<S>>;
+  rect?: OneOrMany<RectData<S>>;
+  line?: OneOrMany<LineData<S>>;
   path?: OneOrMany<PathData>;
   polyline?: OneOrMany<PolylineData>;
   polygon?: OneOrMany<PolygonData>;
-  /** Nested groups and shapes with explicit stacking order */
+  /** Nested groups and shapes */
   group?: OneOrMany<GroupData>;
 }
 
@@ -291,15 +273,15 @@ interface NOT_YET_IMPLEMENT {
 /** Base for shapes that use point iterators */
 export interface PointIteratorProps {
   /** For loop iterator (point required) */
-  for?: ForIterator & PointOutput;
+  for?: ForIterator & PointOutput<ForIteratorScope>;
   /** Spiral iterator (point optional, defaults to [$.x, $.y]) */
-  spiral?: SpiralIterator & PointOutput;
+  spiral?: SpiralIterator & PointOutput<SpiralIteratorScope>;
   /** Lissajous iterator */
-  lissajous?: LissajousIterator & PointOutput;
+  lissajous?: LissajousIterator & PointOutput<LissajousIteratorScope>;
   /** Rose iterator */
-  rose?: RoseIterator & PointOutput;
+  rose?: RoseIterator & PointOutput<RoseIteratorScope>;
   /** Parametric iterator */
-  parametric?: ParametricIterator & PointOutput;
+  parametric?: ParametricIterator & PointOutput<ParametricIteratorScope>;
 }
 
 /** Path from points */
@@ -319,26 +301,26 @@ export interface PolygonData extends PointIteratorProps, StyleProps, InlineModif
 // ============================================================================
 
 /** Circle - single circle, use group iterator for multiples */
-export interface CircleData extends StyleProps {
-  cx: Expr<number>;
-  cy: Expr<number>;
-  r: Expr<number>;
+export interface CircleData<S extends Scope = Scope> extends StyleProps {
+  cx: Expr<number, S>;
+  cy: Expr<number, S>;
+  r: Expr<number, S>;
 }
 
 /** Rectangle - single rect, use group iterator for multiples */
-export interface RectData extends StyleProps {
-  x: Expr<number>;
-  y: Expr<number>;
-  width: Expr<number>;
-  height: Expr<number>;
+export interface RectData<S extends Scope = Scope> extends StyleProps {
+  x: Expr<number, S>;
+  y: Expr<number, S>;
+  width: Expr<number, S>;
+  height: Expr<number, S>;
 }
 
 /** Line - single line, use group iterator for multiples */
-export interface LineData extends Omit<StyleProps, 'fill'> {
-  x1: Expr<number>;
-  y1: Expr<number>;
-  x2: Expr<number>;
-  y2: Expr<number>;
+export interface LineData<S extends Scope = Scope> extends Omit<StyleProps, 'fill'> {
+  x1: Expr<number, S>;
+  y1: Expr<number, S>;
+  x2: Expr<number, S>;
+  y2: Expr<number, S>;
 }
 
 // ============================================================================
@@ -654,15 +636,15 @@ export type Iterator =
 /** Shape iterators that produce shapes at each step */
 export interface ShapeIteratorProps {
   /** For loop iterator that produces shapes */
-  for?: ForIterator & ShapeOutput;
+  for?: ForIterator & ShapeOutput<ForIteratorScope>;
   /** Spiral iterator that produces shapes */
-  spiral?: SpiralIterator & ShapeOutput;
+  spiral?: SpiralIterator & ShapeOutput<SpiralIteratorScope>;
   /** Lissajous iterator that produces shapes */
-  lissajous?: LissajousIterator & ShapeOutput;
+  lissajous?: LissajousIterator & ShapeOutput<LissajousIteratorScope>;
   /** Rose iterator that produces shapes */
-  rose?: RoseIterator & ShapeOutput;
+  rose?: RoseIterator & ShapeOutput<RoseIteratorScope>;
   /** Parametric iterator that produces shapes */
-  parametric?: ParametricIterator & ShapeOutput;
+  parametric?: ParametricIterator & ShapeOutput<ParametricIteratorScope>;
 }
 
 // ============================================================================

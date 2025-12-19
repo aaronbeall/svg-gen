@@ -224,24 +224,22 @@ const circlesOnSpiral: SvgDef = {
   },
 
   // Spiral iterator with circle output - produces one circle per step
-  group: [{
-    spiral: {
-      cx: $ => $.cx,
-      cy: $ => $.cy,
-      startRadius: 30,
-      endRadius: 150,
-      turns: 3,
-      samples: 30,
-      // circle is inside spiral iterator
-      circle: {
-        cx: $ => $.x,  // x from spiral iterator
-        cy: $ => $.y,  // y from spiral iterator
-        r: $ => 5 + $.t * 15,  // radius grows with t (0-1)
-        fill: ($: any) => `hsl(${$.t * 360}, 70%, 50%)`,
-        stroke: 'none'
-      }
+  spiral: {
+    cx: $ => $.cx,
+    cy: $ => $.cy,
+    startRadius: 30,
+    endRadius: 150,
+    turns: 3,
+    samples: 30,
+    // circle is inside spiral iterator
+    circle: {
+      cx: $ => $.x,  // x from spiral iterator
+      cy: $ => $.y,  // y from spiral iterator
+      r: $ => 5 + $.t * 15,  // radius grows with t (0-1)
+      fill: ($: any) => `hsl(${$.t * 360}, 70%, 50%)`,
+      stroke: 'none'
     }
-  }]
+  }
 };
 
 output('circles-spiral', circlesOnSpiral);
@@ -255,7 +253,16 @@ const groupIterator: SvgDef = {
     cy: 200
   },
 
-  group: [{
+  group: {
+    rect: {
+      x: 100,
+      y: 100,
+      width: 200,
+      height: 200,
+      fill: 'none',
+      stroke: 'black',
+      strokeWidth: 2
+    },
     spiral: {
       cx: $ => $.cx,
       cy: $ => $.cy,
@@ -272,7 +279,7 @@ const groupIterator: SvgDef = {
         stroke: 'darkred'
       }
     }
-  }]
+  }
 };
 
 output('group-iterator', groupIterator);
