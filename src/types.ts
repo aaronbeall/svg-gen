@@ -85,15 +85,18 @@ export interface GroupData {
 // SVG Element & Geometry
 // ============================================================================
 
+/** Single item or array of items */
+type OneOrMany<T> = T | T[];
+
 export interface SvgDef {
   size: [number, number];
   let?: LetBlock;
-  path?: PathData;
-  circle?: CircleData;
-  rect?: RectData;
-  line?: LineData;
-  polyline?: PolylineData;
-  polygon?: PolygonData;
+  path?: OneOrMany<PathData>;
+  circle?: OneOrMany<CircleData>;
+  rect?: OneOrMany<RectData>;
+  line?: OneOrMany<LineData>;
+  polyline?: OneOrMany<PolylineData>;
+  polygon?: OneOrMany<PolygonData>;
   group?: GroupData[];
 }
 
@@ -107,14 +110,14 @@ export interface Geometry {
 
 /**
  * Creates an SVG geometry definition.
- * 
+ *
  * The `let` block defines scope variables. Values can be:
  * - Static: `cx: 100`
  * - Computed: `step: $ => Math.PI / $.spikes`
- * 
+ *
  * Computed values can reference any other let value via `$`.
  * The evaluator resolves these in order, accumulating the scope.
- * 
+ *
  * @example
  * const star = svg({
  *   size: [200, 200],

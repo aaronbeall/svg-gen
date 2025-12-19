@@ -192,15 +192,21 @@ export function render(geometry: Geometry): RenderResult {
   // Create scope from let block
   const scope = createScope(svg.let);
 
+  // Helper to normalize single item or array to array
+  const toArray = <T>(item: T | T[] | undefined): T[] => {
+    if (!item) return [];
+    return Array.isArray(item) ? item : [item];
+  };
+
   // Generate SVG elements
   const elements: string[] = [];
 
-  if (svg.path) elements.push(generatePath(svg.path, scope));
-  if (svg.circle) elements.push(generateCircle(svg.circle, scope));
-  if (svg.rect) elements.push(generateRect(svg.rect, scope));
-  if (svg.line) elements.push(generateLine(svg.line, scope));
-  if (svg.polyline) elements.push(generatePolyline(svg.polyline, scope));
-  if (svg.polygon) elements.push(generatePolygon(svg.polygon, scope));
+  for (const p of toArray(svg.path)) elements.push(generatePath(p, scope));
+  for (const c of toArray(svg.circle)) elements.push(generateCircle(c, scope));
+  for (const r of toArray(svg.rect)) elements.push(generateRect(r, scope));
+  for (const l of toArray(svg.line)) elements.push(generateLine(l, scope));
+  for (const pl of toArray(svg.polyline)) elements.push(generatePolyline(pl, scope));
+  for (const pg of toArray(svg.polygon)) elements.push(generatePolygon(pg, scope));
 
   if (svg.group) {
     for (const groupData of svg.group) {
