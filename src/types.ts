@@ -1,177 +1,147 @@
 // ============================================================================
-// Core Expression Types
+// Core Types
 // ============================================================================
 
-/** Expression that evaluates against a scope - can be a value or a function */
-export type Expr<T, S = any> = T | ((scope: S) => T);
+/** The scope type - index signature avoids implicit any errors */
+export interface Scope {
+  [key: string]: any;
+}
 
-/** Extract the evaluated type from a Let block entry */
-export type EvalLetEntry<T> = T extends (scope: any) => infer R ? R : T;
+/** Expression: either a static value or a function of scope */
+export type Expr<T> = T | (($: Scope) => T);
 
-/** Extract the evaluated types from a Let block */
-export type EvalLetBlock<L> = {
-  [K in keyof L]: EvalLetEntry<L[K]>;
-};
-
-// ============================================================================
-// Scope type - the $ parameter type in expressions
-// ============================================================================
-
-/**
- * Defines the scope type that will be available in expressions.
- * Use this to declare what variables are available in your geometry.
- */
-export type Scope<T extends Record<string, any>> = T;
-
-// ============================================================================
-// For Loop with nested let - the key to scoped evaluation
-// ============================================================================
-
-/** For loop construct with optional inner let block */
-export interface ForLoop<
-  ParentScope,
-  InnerLet extends Record<string, Expr<any, any>> = {}
-> {
-  i: number;
-  to: Expr<number, ParentScope & { i: number }>;
-  let?: InnerLet;
-  point: [
-    Expr<number, ParentScope & { i: number } & EvalLetBlock<InnerLet>>,
-    Expr<number, ParentScope & { i: number } & EvalLetBlock<InnerLet>>
-  ];
+/** A let block: static values or expressions */
+export interface LetBlock {
+  [key: string]: number | string | boolean | (($: Scope) => number | string | boolean);
 }
 
 // ============================================================================
 // Geometry Primitives
 // ============================================================================
 
-export interface PathData<S, ForLet extends Record<string, Expr<any, any>> = {}> {
-  for?: ForLoop<S, ForLet>;
+export interface ForLoop {
+  i: number;
+  to: Expr<number>;
+  let?: LetBlock;
+  point: [Expr<number>, Expr<number>];
+}
+
+export interface PathData {
+  for?: ForLoop;
   close?: boolean;
 }
 
-export interface CircleData<S> {
-  cx: Expr<number, S>;
-  cy: Expr<number, S>;
-  r: Expr<number, S>;
-  fill?: Expr<string, S>;
-  stroke?: Expr<string, S>;
-  strokeWidth?: Expr<number, S>;
+export interface CircleData {
+  cx: Expr<number>;
+  cy: Expr<number>;
+  r: Expr<number>;
+  fill?: Expr<string>;
+  stroke?: Expr<string>;
+  strokeWidth?: Expr<number>;
 }
 
-export interface RectData<S> {
-  x: Expr<number, S>;
-  y: Expr<number, S>;
-  width: Expr<number, S>;
-  height: Expr<number, S>;
-  fill?: Expr<string, S>;
-  stroke?: Expr<string, S>;
-  strokeWidth?: Expr<number, S>;
+export interface RectData {
+  x: Expr<number>;
+  y: Expr<number>;
+  width: Expr<number>;
+  height: Expr<number>;
+  fill?: Expr<string>;
+  stroke?: Expr<string>;
+  strokeWidth?: Expr<number>;
 }
 
-export interface LineData<S> {
-  x1: Expr<number, S>;
-  y1: Expr<number, S>;
-  x2: Expr<number, S>;
-  y2: Expr<number, S>;
-  stroke?: Expr<string, S>;
-  strokeWidth?: Expr<number, S>;
+export interface LineData {
+  x1: Expr<number>;
+  y1: Expr<number>;
+  x2: Expr<number>;
+  y2: Expr<number>;
+  stroke?: Expr<string>;
+  strokeWidth?: Expr<number>;
 }
 
-export interface PolylineData<S, ForLet extends Record<string, Expr<any, any>> = {}> {
-  for?: ForLoop<S, ForLet>;
-  fill?: Expr<string, S>;
-  stroke?: Expr<string, S>;
-  strokeWidth?: Expr<number, S>;
+export interface PolylineData {
+  for?: ForLoop;
+  fill?: Expr<string>;
+  stroke?: Expr<string>;
+  strokeWidth?: Expr<number>;
 }
 
-export interface PolygonData<S, ForLet extends Record<string, Expr<any, any>> = {}> {
-  for?: ForLoop<S, ForLet>;
-  fill?: Expr<string, S>;
-  stroke?: Expr<string, S>;
-  strokeWidth?: Expr<number, S>;
+export interface PolygonData {
+  for?: ForLoop;
+  fill?: Expr<string>;
+  stroke?: Expr<string>;
+  strokeWidth?: Expr<number>;
 }
 
-export interface GroupData<S> {
-  transform?: Expr<string, S>;
-  path?: PathData<S>;
-  circle?: CircleData<S>;
-  rect?: RectData<S>;
-  line?: LineData<S>;
+export interface GroupData {
+  transform?: Expr<string>;
+  path?: PathData;
+  circle?: CircleData;
+  rect?: RectData;
+  line?: LineData;
 }
 
 // ============================================================================
-// SVG Root Element
+// SVG Element & Geometry
 // ============================================================================
 
-export interface SvgElement<
-  LetBlock extends Record<string, Expr<any, any>> = {},
-  PathForLet extends Record<string, Expr<any, any>> = {},
-  PolylineForLet extends Record<string, Expr<any, any>> = {},
-  PolygonForLet extends Record<string, Expr<any, any>> = {}
-> {
+export interface SvgDef {
   size: [number, number];
   let?: LetBlock;
-  path?: PathData<EvalLetBlock<LetBlock>, PathForLet>;
-  circle?: CircleData<EvalLetBlock<LetBlock>>;
-  rect?: RectData<EvalLetBlock<LetBlock>>;
-  line?: LineData<EvalLetBlock<LetBlock>>;
-  polyline?: PolylineData<EvalLetBlock<LetBlock>, PolylineForLet>;
-  polygon?: PolygonData<EvalLetBlock<LetBlock>, PolygonForLet>;
-  group?: GroupData<EvalLetBlock<LetBlock>>[];
+  path?: PathData;
+  circle?: CircleData;
+  rect?: RectData;
+  line?: LineData;
+  polyline?: PolylineData;
+  polygon?: PolygonData;
+  group?: GroupData[];
 }
 
-/** Root geometry definition */
 export interface Geometry {
-  svg: SvgElement<any, any, any, any>;
+  svg: SvgDef;
 }
 
 // ============================================================================
-// Builder functions for type-safe geometry definitions
+// Builder
 // ============================================================================
 
 /**
- * Creates a type-safe geometry definition.
- * The type parameters are inferred from the structure you provide.
- */
-export function svg<
-  L extends Record<string, Expr<any, EvalLetBlock<L>>>,
-  PathL extends Record<string, Expr<any, EvalLetBlock<L> & { i: number } & EvalLetBlock<PathL>>>,
-  PolylineL extends Record<string, Expr<any, EvalLetBlock<L> & { i: number } & EvalLetBlock<PolylineL>>>,
-  PolygonL extends Record<string, Expr<any, EvalLetBlock<L> & { i: number } & EvalLetBlock<PolygonL>>>
->(def: SvgElement<L, PathL, PolylineL, PolygonL>): Geometry {
-  return { svg: def };
-}
-
-/**
- * Alternative: Define geometry with an explicit scope type.
- * This allows you to use `$` without type annotations in arrow functions.
+ * Creates an SVG geometry definition.
+ * 
+ * The `let` block defines scope variables. Values can be:
+ * - Static: `cx: 100`
+ * - Computed: `step: $ => Math.PI / $.spikes`
+ * 
+ * Computed values can reference any other let value via `$`.
+ * The evaluator resolves these in order, accumulating the scope.
  * 
  * @example
- * type MyScope = { cx: number; cy: number; r: number };
- * const geo = defineGeometry<MyScope>()({
+ * const star = svg({
  *   size: [200, 200],
- *   let: { cx: 100, cy: 100, r: 50 },
- *   circle: { cx: $ => $.cx, cy: $ => $.cy, r: $ => $.r }
+ *   let: {
+ *     cx: 100,
+ *     cy: 100,
+ *     spikes: 5,
+ *     rot: -90 * Math.PI / 180,
+ *     step: $ => Math.PI / $.spikes
+ *   },
+ *   path: {
+ *     for: {
+ *       i: 0,
+ *       to: $ => $.spikes * 2,
+ *       let: {
+ *         r: $ => $.i % 2 === 0 ? $.outer : $.inner,
+ *         a: $ => $.rot + $.i * $.step
+ *       },
+ *       point: [
+ *         $ => $.cx + Math.cos($.a) * $.r,
+ *         $ => $.cy + Math.sin($.a) * $.r
+ *       ]
+ *     },
+ *     close: true
+ *   }
  * });
  */
-export function defineGeometry<S extends Record<string, any>>() {
-  return function<
-    L extends { [K in keyof S]: Expr<S[K], S> },
-    PathL extends Record<string, Expr<any, S & { i: number } & EvalLetBlock<PathL>>>,
-    PolylineL extends Record<string, Expr<any, S & { i: number } & EvalLetBlock<PolylineL>>>,
-    PolygonL extends Record<string, Expr<any, S & { i: number } & EvalLetBlock<PolygonL>>>
-  >(def: {
-    size: [number, number];
-    let?: L;
-    path?: PathData<S, PathL>;
-    circle?: CircleData<S>;
-    rect?: RectData<S>;
-    line?: LineData<S>;
-    polyline?: PolylineData<S, PolylineL>;
-    polygon?: PolygonData<S, PolygonL>;
-    group?: GroupData<S>[];
-  }): Geometry {
-    return { svg: def as any };
-  };
+export function svg(def: SvgDef): Geometry {
+  return { svg: def };
 }

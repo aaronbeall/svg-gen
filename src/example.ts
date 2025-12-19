@@ -1,26 +1,13 @@
-import { svg, defineGeometry, render } from './index.js';
+import { svg, render } from './index.js';
 import * as fs from 'fs';
 
 // ============================================================================
-// Star Geometry Example - Using defineGeometry with explicit scope type
-// This approach provides full type safety with clean syntax
+// Star Geometry Example
+// `let` is a static block where values can be expressions ($ => ...)
+// The evaluator resolves expressions via getters, so $.step just works
 // ============================================================================
 
-// Define the scope type - all variables available in expressions
-type StarScope = {
-  cx: number;
-  cy: number;
-  spikes: number;
-  outer: number;
-  inner: number;
-  rot: number;
-  step: number;
-};
-
-// Inner loop scope extends parent scope with loop variable and inner let bindings
-type StarLoopScope = StarScope & { i: number; r: number; a: number };
-
-const star = defineGeometry<StarScope>()({
+const star = svg({
   size: [200, 200],
 
   let: {
@@ -29,7 +16,7 @@ const star = defineGeometry<StarScope>()({
     spikes: 5,
     outer: 80,
     inner: 35,
-    rot: $ => -90 * Math.PI / 180,
+    rot: -90 * Math.PI / 180,
     step: $ => Math.PI / $.spikes
   },
 
@@ -39,13 +26,13 @@ const star = defineGeometry<StarScope>()({
       to: $ => $.spikes * 2,
 
       let: {
-        r: ($: StarScope & { i: number }) => $.i % 2 === 0 ? $.outer : $.inner,
-        a: ($: StarScope & { i: number }) => $.rot + $.i * $.step
+        r: $ => $.i % 2 === 0 ? $.outer : $.inner,
+        a: $ => $.rot + $.i * $.step
       },
 
       point: [
-        ($: StarLoopScope) => $.cx + Math.cos($.a) * $.r,
-        ($: StarLoopScope) => $.cy + Math.sin($.a) * $.r
+        $ => $.cx + Math.cos($.a) * $.r,
+        $ => $.cy + Math.sin($.a) * $.r
       ]
     },
 
@@ -72,10 +59,8 @@ output('star', star);
 // Additional Examples
 // ============================================================================
 
-// Circle example - using defineGeometry for clean syntax
-type CircleScope = { centerX: number; centerY: number; radius: number };
-
-const circleExample = defineGeometry<CircleScope>()({
+// Circle example
+const circleExample = svg({
   size: [100, 100],
 
   let: {
@@ -97,10 +82,7 @@ const circleExample = defineGeometry<CircleScope>()({
 output('circle', circleExample);
 
 // Hexagon example using polygon
-type HexScope = { cx: number; cy: number; r: number; sides: number };
-type HexLoopScope = HexScope & { i: number; angle: number };
-
-const hexagon = defineGeometry<HexScope>()({
+const hexagon = svg({
   size: [200, 200],
 
   let: {
@@ -116,12 +98,12 @@ const hexagon = defineGeometry<HexScope>()({
       to: $ => $.sides,
 
       let: {
-        angle: ($: HexScope & { i: number }) => ($.i * 2 * Math.PI / $.sides) - Math.PI / 2
+        angle: $ => ($.i * 2 * Math.PI / $.sides) - Math.PI / 2
       },
 
       point: [
-        ($: HexLoopScope) => $.cx + Math.cos($.angle) * $.r,
-        ($: HexLoopScope) => $.cy + Math.sin($.angle) * $.r
+        $ => $.cx + Math.cos($.angle) * $.r,
+        $ => $.cy + Math.sin($.angle) * $.r
       ]
     },
     fill: 'gold',

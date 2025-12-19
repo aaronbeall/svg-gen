@@ -13,30 +13,31 @@ A declarative eDSL for generating SVGs in TypeScript with full type safety and s
 ## Usage
 
 ```typescript
-import { defineGeometry, render } from './index.js';
+import { svg, render } from './index.js';
 
-type StarScope = {
-  cx: number; cy: number;
-  spikes: number; outer: number; inner: number;
-  rot: number; step: number;
-};
-
-const star = defineGeometry<StarScope>()({
+const star = svg({
   size: [200, 200],
+
   let: {
-    cx: 100, cy: 100,
-    spikes: 5, outer: 80, inner: 35,
-    rot: $ => -90 * Math.PI / 180,
-    step: $ => Math.PI / $.spikes
+    cx: 100,
+    cy: 100,
+    spikes: 5,
+    outer: 80,
+    inner: 35,
+    rot: -90 * Math.PI / 180,
+    step: $ => Math.PI / $.spikes  // computed from other values
   },
+
   path: {
     for: {
       i: 0,
       to: $ => $.spikes * 2,
+
       let: {
         r: $ => $.i % 2 === 0 ? $.outer : $.inner,
         a: $ => $.rot + $.i * $.step
       },
+
       point: [
         $ => $.cx + Math.cos($.a) * $.r,
         $ => $.cy + Math.sin($.a) * $.r
@@ -46,8 +47,15 @@ const star = defineGeometry<StarScope>()({
   }
 });
 
-const { svg, html } = render(star);
+const { svg: svgString, html } = render(star);
 ```
+
+### How It Works
+
+- **`let` block**: Define scope variables as static values or expressions (`$ => ...`)
+- **Expressions**: Arrow functions receive the accumulated scope as `$`
+- **Lazy evaluation**: The evaluator resolves expressions via getters, so `$.step` works even if `step` is a function
+- **Scoped `for` loops**: Loop variables (`i`) and inner `let` blocks extend the parent scope
 
 ## Examples
 
