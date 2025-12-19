@@ -12,7 +12,7 @@ function pointsToAttr(points: EvalPoint[]): string {
 function elementToString(el: EvalElement, indent = '  '): string {
   switch (el.type) {
     case 'path':
-      return `${indent}<path d="${el.d}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"/>`;
+      return `${indent}<path d="${el.d}" fill="none" stroke="black" stroke-width="2"/>`;
     case 'circle':
       return `${indent}<circle cx="${el.cx}" cy="${el.cy}" r="${el.r}" fill="${el.fill}" stroke="${el.stroke}" stroke-width="${el.strokeWidth}"/>`;
     case 'rect':
@@ -55,7 +55,7 @@ function createSvgElement(tag: string, attrs: Record<string, string | number>): 
 function elementToDom(el: EvalElement): SVGElement {
   switch (el.type) {
     case 'path':
-      return createSvgElement('path', { d: el.d, fill: el.fill, stroke: el.stroke, strokeWidth: el.strokeWidth });
+      return createSvgElement('path', { d: el.d, fill: 'none', stroke: 'black', strokeWidth: 2 });
     case 'circle':
       return createSvgElement('circle', { cx: el.cx, cy: el.cy, r: el.r, fill: el.fill, stroke: el.stroke, strokeWidth: el.strokeWidth });
     case 'rect':
