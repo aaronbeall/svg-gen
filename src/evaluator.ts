@@ -1,6 +1,6 @@
 import type {
   SvgDef, LetBlock, PathData, CircleData, RectData, LineData, PolylineData, PolygonData, GroupData,
-  ForIterator, SpiralIterator, LissajousIterator, RoseIterator, ParametricIterator,
+  ForIterator, GridIterator, SpiralIterator, LissajousIterator, RoseIterator, ParametricIterator,
   ShapeOutput, ShapeIteratorProps, Scope
 } from './types.js';
 
@@ -422,15 +422,42 @@ function* iterateParametric(data: ParametricIterator, parentScope: Record<string
   }
 }
 
+/** Iterate a grid, yielding scope steps with x, y, row, col, i, t */
+function* iterateGrid(data: GridIterator, parentScope: Record<string, ScopeValue>): Generator<IteratorStep> {
+  const cols = evalExpr(data.cols, parentScope);
+  const rows = evalExpr(data.rows, parentScope);
+  const cellWidth = data.cellWidth ? evalExpr(data.cellWidth, parentScope) : 1;
+  const cellHeight = data.cellHeight ? evalExpr(data.cellHeight, parentScope) : 1;
+  const offsetX = data.x ? evalExpr(data.x, parentScope) : 0;
+  const offsetY = data.y ? evalExpr(data.y, parentScope) : 0;
+
+  const total = cols * rows;
+  let i = 0;
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const t = total > 1 ? i / (total - 1) : 0;
+      const stepScope = {
+        x: offsetX + col * cellWidth + cellWidth / 2,
+        y: offsetY + row * cellHeight + cellHeight / 2,
+        row, col, i, t
+      };
+      const innerScope = data.let ? createScope(data.let as AnyLetBlock, { ...parentScope, ...stepScope }) : stepScope;
+      yield { ...stepScope, ...innerScope };
+      i++;
+    }
+  }
+}
+
 /** Get iterator from point-based shape data */
 function getPointIterator(data: PathData | PolylineData | PolygonData, scope: Record<string, ScopeValue>): Generator<IteratorStep> | null {
   if (data.for) return iterateFor(data.for, scope);
+  if (data.grid) return iterateGrid(data.grid, scope);
   if (data.spiral) return iterateSpiral(data.spiral, scope);
   if (data.lissajous) return iterateLissajous(data.lissajous, scope);
   if (data.rose) return iterateRose(data.rose, scope);
   if (data.parametric) return iterateParametric(data.parametric, scope);
   // Not yet implemented
-  if (data.grid) throw new Error('GridIterator not yet implemented');
   if (data.superformula) throw new Error('SuperformulaIterator not yet implemented');
   if (data.epitrochoid) throw new Error('EpitrochoidIterator not yet implemented');
   if (data.hypotrochoid) throw new Error('HypotrochoidIterator not yet implemented');
@@ -457,12 +484,12 @@ interface IteratorWithOutput {
 function getShapeIterators(data: ShapeIteratorProps, scope: Record<string, ScopeValue>): IteratorWithOutput[] {
   const result: IteratorWithOutput[] = [];
   if (data.for) result.push({ iterator: iterateFor(data.for, scope), output: data.for as AnyShapeOutput });
+  if (data.grid) result.push({ iterator: iterateGrid(data.grid, scope), output: data.grid as AnyShapeOutput });
   if (data.spiral) result.push({ iterator: iterateSpiral(data.spiral, scope), output: data.spiral as AnyShapeOutput });
   if (data.lissajous) result.push({ iterator: iterateLissajous(data.lissajous, scope), output: data.lissajous as AnyShapeOutput });
   if (data.rose) result.push({ iterator: iterateRose(data.rose, scope), output: data.rose as AnyShapeOutput });
   if (data.parametric) result.push({ iterator: iterateParametric(data.parametric, scope), output: data.parametric as AnyShapeOutput });
   // Not yet implemented
-  if (data.grid) throw new Error('GridIterator not yet implemented');
   if (data.superformula) throw new Error('SuperformulaIterator not yet implemented');
   if (data.epitrochoid) throw new Error('EpitrochoidIterator not yet implemented');
   if (data.hypotrochoid) throw new Error('HypotrochoidIterator not yet implemented');

@@ -304,3 +304,24 @@ const groupIterator: SvgDef = {
 };
 
 output('group-iterator', groupIterator);
+
+// Grid iterator example - creates a grid of circles
+const gridExample: SvgDef = {
+  size: [400, 400],
+
+  grid: {
+    cols: 8,
+    rows: 8,
+    cellWidth: 50,
+    cellHeight: 50,
+    circle: {
+      cx: $ => $.x,
+      cy: $ => $.y,
+      r: $ => 10 + $.t * 10,
+      fill: ($: any) => `hsl(${$.col * 45}, 70%, ${50 + $.row * 5}%)`,
+      stroke: 'none'
+    }
+  }
+};
+
+output('grid', gridExample);
