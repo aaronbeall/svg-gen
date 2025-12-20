@@ -463,17 +463,23 @@ export interface PointIteratorProps {
   grid?: GridIterator & PointOutput<GridIteratorScope>;
 }
 
+/** Direct points array (alternative to iterator) */
+export interface DirectPoints<S extends Scope = Scope> {
+  /** Direct array of [x, y] points */
+  points?: Expr<[number, number][], S>;
+}
+
 /** Path from points */
-export interface PathData extends PointIteratorProps, StyleProps, InlineModifiers {
+export interface PathData<S extends Scope = Scope> extends PointIteratorProps, DirectPoints<S>, StyleProps, InlineModifiers {
   /** Close the path */
   close?: boolean;
 }
 
 /** Polyline from points */
-export interface PolylineData extends PointIteratorProps, StyleProps, InlineModifiers {}
+export interface PolylineData<S extends Scope = Scope> extends PointIteratorProps, DirectPoints<S>, StyleProps, InlineModifiers {}
 
 /** Polygon from points */
-export interface PolygonData extends PointIteratorProps, StyleProps, InlineModifiers {}
+export interface PolygonData<S extends Scope = Scope> extends PointIteratorProps, DirectPoints<S>, StyleProps, InlineModifiers {}
 
 // ============================================================================
 // Fixed Shapes (no iterators - use container iterators to produce multiples)

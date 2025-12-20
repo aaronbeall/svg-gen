@@ -795,3 +795,35 @@ const levyCurve: SvgDef = {
 };
 
 output('fractal-levy', levyCurve);
+
+// Voronoi example - cells from seed points
+const voronoiExample: SvgDef = {
+  size: [400, 400],
+
+  voronoi: {
+    points: [
+      [50, 80], [120, 40], [200, 60], [280, 30], [350, 70],
+      [40, 150], [100, 180], [180, 140], [260, 160], [340, 130],
+      [60, 240], [140, 280], [220, 220], [300, 260], [370, 200],
+      [30, 320], [110, 360], [190, 340], [270, 380], [350, 330]
+    ],
+    bounds: { x: 0, y: 0, width: 400, height: 400 },
+    // Draw each cell as a polygon using the vertices
+    polygon: {
+      points: $ => $.vertices,
+      fill: ($: any) => `hsl(${$.i * 18}, 70%, 85%)`,
+      stroke: 'white',
+      strokeWidth: 2
+    },
+    // Also draw a circle at each cell center
+    circle: {
+      cx: $ => $.x,
+      cy: $ => $.y,
+      r: 4,
+      fill: ($: any) => `hsl(${$.i * 18}, 70%, 40%)`,
+      stroke: 'none'
+    }
+  }
+};
+
+output('voronoi', voronoiExample);

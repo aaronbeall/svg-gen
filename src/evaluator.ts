@@ -1,7 +1,8 @@
 import type {
   SvgDef, LetBlock, PathData, CircleData, RectData, LineData, PolylineData, PolygonData, GroupData,
   ForIterator, GridIterator, SpiralIterator, LissajousIterator, RoseIterator, ParametricIterator,
-  SuperformulaIterator, EpitrochoidIterator, HypotrochoidIterator, FlowfieldIterator, AttractorIterator, FractalIterator,
+  SuperformulaIterator, EpitrochoidIterator, HypotrochoidIterator, FlowfieldIterator, AttractorIterator,
+  FractalIterator, VoronoiIterator,
   ShapeOutput, ShapeIteratorProps, Scope
 } from './types.js';
 
@@ -177,8 +178,15 @@ function getPointExprs(data: PathData | PolylineData | PolygonData): [any, any][
   return pointExpr as [any, any][];
 }
 
-/** Evaluate points from iterator steps */
+/** Evaluate points from iterator steps or direct points array */
 function evalPoints(data: PathData | PolylineData | PolygonData, scope: Record<string, ScopeValue>): EvalPoint[] {
+  // Check for direct points array first
+  if (data.points) {
+    const pointsArray = evalExpr(data.points, scope);
+    return pointsArray.map(([x, y]) => ({ x, y }));
+  }
+
+  // Otherwise use iterator
   const steps = collectPointIterator(data, scope);
   const pointExprs = getPointExprs(data);
 
@@ -829,6 +837,138 @@ function* iterateFractal(data: FractalIterator, parentScope: Record<string, Scop
   }
 }
 
+/** Compute Voronoi diagram using Fortune's algorithm (simplified brute-force for now) */
+function computeVoronoi(
+  sites: { x: number; y: number }[],
+  bounds: { x: number; y: number; width: number; height: number }
+): { center: { x: number; y: number }; vertices: [number, number][] }[] {
+  const cells: { center: { x: number; y: number }; vertices: [number, number][] }[] = [];
+  const { x: bx, y: by, width, height } = bounds;
+  const resolution = 2; // pixels per sample
+
+  // For each site, find its Voronoi cell by sampling
+  for (const site of sites) {
+    const cellPoints: Set<string> = new Set();
+    
+    // Sample grid points and find which belong to this cell
+    for (let py = by; py <= by + height; py += resolution) {
+      for (let px = bx; px <= bx + width; px += resolution) {
+        // Find closest site
+        let minDist = Infinity;
+        let closest = site;
+        for (const s of sites) {
+          const d = (px - s.x) ** 2 + (py - s.y) ** 2;
+          if (d < minDist) {
+            minDist = d;
+            closest = s;
+          }
+        }
+        if (closest === site) {
+          cellPoints.add(`${px},${py}`);
+        }
+      }
+    }
+
+    // Convert sampled points to convex hull for cell boundary
+    const points: [number, number][] = Array.from(cellPoints).map(s => {
+      const [x, y] = s.split(',').map(Number);
+      return [x, y] as [number, number];
+    });
+
+    if (points.length > 2) {
+      const hull = convexHull(points);
+      cells.push({ center: site, vertices: hull });
+    }
+  }
+
+  return cells;
+}
+
+/** Compute convex hull using Graham scan */
+function convexHull(points: [number, number][]): [number, number][] {
+  if (points.length < 3) return points;
+
+  // Find bottom-most point (or left-most in case of tie)
+  let start = 0;
+  for (let i = 1; i < points.length; i++) {
+    if (points[i][1] < points[start][1] ||
+        (points[i][1] === points[start][1] && points[i][0] < points[start][0])) {
+      start = i;
+    }
+  }
+  [points[0], points[start]] = [points[start], points[0]];
+  const pivot = points[0];
+
+  // Sort by polar angle
+  const sorted = points.slice(1).sort((a, b) => {
+    const angleA = Math.atan2(a[1] - pivot[1], a[0] - pivot[0]);
+    const angleB = Math.atan2(b[1] - pivot[1], b[0] - pivot[0]);
+    return angleA - angleB;
+  });
+
+  // Build hull
+  const hull: [number, number][] = [pivot];
+  for (const p of sorted) {
+    while (hull.length > 1) {
+      const a = hull[hull.length - 2];
+      const b = hull[hull.length - 1];
+      const cross = (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
+      if (cross <= 0) hull.pop();
+      else break;
+    }
+    hull.push(p);
+  }
+
+  return hull;
+}
+
+/** Iterate Voronoi cells, yielding scope steps with x, y (center), vertices, i */
+function* iterateVoronoi(data: VoronoiIterator, parentScope: Record<string, ScopeValue>): Generator<IteratorStep> {
+  // Evaluate seed points
+  const sites = data.points.map(([xExpr, yExpr]) => ({
+    x: evalExpr(xExpr, parentScope),
+    y: evalExpr(yExpr, parentScope)
+  }));
+
+  // Get bounds (default to bounding box of points with padding)
+  let bounds: { x: number; y: number; width: number; height: number };
+  if (data.bounds) {
+    bounds = {
+      x: evalExpr(data.bounds.x, parentScope),
+      y: evalExpr(data.bounds.y, parentScope),
+      width: evalExpr(data.bounds.width, parentScope),
+      height: evalExpr(data.bounds.height, parentScope)
+    };
+  } else {
+    const xs = sites.map(s => s.x);
+    const ys = sites.map(s => s.y);
+    const padding = 20;
+    bounds = {
+      x: Math.min(...xs) - padding,
+      y: Math.min(...ys) - padding,
+      width: Math.max(...xs) - Math.min(...xs) + padding * 2,
+      height: Math.max(...ys) - Math.min(...ys) + padding * 2
+    };
+  }
+
+  const cells = computeVoronoi(sites, bounds);
+
+  for (let i = 0; i < cells.length; i++) {
+    const cell = cells[i];
+    const t = cells.length > 1 ? i / (cells.length - 1) : 0;
+
+    const stepScope = {
+      x: cell.center.x,
+      y: cell.center.y,
+      vertices: cell.vertices,
+      t,
+      i
+    };
+    const innerScope = data.let ? createScope(data.let as AnyLetBlock, { ...parentScope, ...stepScope }) : stepScope;
+    yield { ...stepScope, ...innerScope };
+  }
+}
+
 /** Get iterator from point-based shape data */
 function getPointIterator(data: PathData | PolylineData | PolygonData, scope: Record<string, ScopeValue>): Generator<IteratorStep> | null {
   if (data.for) return iterateFor(data.for, scope);
@@ -874,8 +1014,8 @@ function getShapeIterators(data: ShapeIteratorProps, scope: Record<string, Scope
   if (data.flowfield) result.push({ iterator: iterateFlowfield(data.flowfield, scope), output: data.flowfield as AnyShapeOutput });
   if (data.attractor) result.push({ iterator: iterateAttractor(data.attractor, scope), output: data.attractor as AnyShapeOutput });
   if (data.fractal) result.push({ iterator: iterateFractal(data.fractal, scope), output: data.fractal as AnyShapeOutput });
+  if (data.voronoi) result.push({ iterator: iterateVoronoi(data.voronoi, scope), output: data.voronoi as AnyShapeOutput });
   // Not yet implemented
-  if (data.voronoi) throw new Error('VoronoiIterator not yet implemented');
   if (data.delaunay) throw new Error('DelaunayIterator not yet implemented');
   if (data.tile) throw new Error('TileIterator not yet implemented');
   if (data.pack) throw new Error('PackIterator not yet implemented');
