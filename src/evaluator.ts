@@ -1,6 +1,6 @@
 import type {
   SvgDef, LetBlock, PathData, CircleData, RectData, LineData, PolylineData, PolygonData, GroupData,
-  ForIterator, GridIterator, SpiralIterator, LissajousIterator, RoseIterator, ParametricIterator,
+  ForIterator, GridIterator, SpiralIterator, LissajousIterator, RoseIterator, ParametricIterator, SuperformulaIterator,
   ShapeOutput, ShapeIteratorProps, Scope
 } from './types.js';
 
@@ -449,6 +449,38 @@ function* iterateGrid(data: GridIterator, parentScope: Record<string, ScopeValue
   }
 }
 
+/** Iterate a superformula (Gielis formula), yielding scope steps with x, y, theta, r, t, i */
+function* iterateSuperformula(data: SuperformulaIterator, parentScope: Record<string, ScopeValue>): Generator<IteratorStep> {
+  const cx = evalExpr(data.cx, parentScope);
+  const cy = evalExpr(data.cy, parentScope);
+  const scale = data.scale ? evalExpr(data.scale, parentScope) : 1;
+  const m = evalExpr(data.m, parentScope);
+  const n1 = evalExpr(data.n1, parentScope);
+  const n2 = evalExpr(data.n2, parentScope);
+  const n3 = evalExpr(data.n3, parentScope);
+  const a = data.a ? evalExpr(data.a, parentScope) : 1;
+  const b = data.b ? evalExpr(data.b, parentScope) : 1;
+  const samples = data.samples ? evalExpr(data.samples, parentScope) : 200;
+
+  for (let i = 0; i <= samples; i++) {
+    const t = i / samples;
+    const theta = t * 2 * Math.PI;
+
+    // Superformula: r(theta) = (|cos(m*theta/4)/a|^n2 + |sin(m*theta/4)/b|^n3)^(-1/n1)
+    const term1 = Math.abs(Math.cos(m * theta / 4) / a);
+    const term2 = Math.abs(Math.sin(m * theta / 4) / b);
+    const r = scale * Math.pow(Math.pow(term1, n2) + Math.pow(term2, n3), -1 / n1);
+
+    const stepScope = {
+      x: cx + r * Math.cos(theta),
+      y: cy + r * Math.sin(theta),
+      theta, r, t, i
+    };
+    const innerScope = data.let ? createScope(data.let as AnyLetBlock, { ...parentScope, ...stepScope }) : stepScope;
+    yield { ...stepScope, ...innerScope };
+  }
+}
+
 /** Get iterator from point-based shape data */
 function getPointIterator(data: PathData | PolylineData | PolygonData, scope: Record<string, ScopeValue>): Generator<IteratorStep> | null {
   if (data.for) return iterateFor(data.for, scope);
@@ -457,8 +489,8 @@ function getPointIterator(data: PathData | PolylineData | PolygonData, scope: Re
   if (data.lissajous) return iterateLissajous(data.lissajous, scope);
   if (data.rose) return iterateRose(data.rose, scope);
   if (data.parametric) return iterateParametric(data.parametric, scope);
+  if (data.superformula) return iterateSuperformula(data.superformula, scope);
   // Not yet implemented
-  if (data.superformula) throw new Error('SuperformulaIterator not yet implemented');
   if (data.epitrochoid) throw new Error('EpitrochoidIterator not yet implemented');
   if (data.hypotrochoid) throw new Error('HypotrochoidIterator not yet implemented');
   if (data.fractal) throw new Error('FractalIterator not yet implemented');
@@ -489,8 +521,8 @@ function getShapeIterators(data: ShapeIteratorProps, scope: Record<string, Scope
   if (data.lissajous) result.push({ iterator: iterateLissajous(data.lissajous, scope), output: data.lissajous as AnyShapeOutput });
   if (data.rose) result.push({ iterator: iterateRose(data.rose, scope), output: data.rose as AnyShapeOutput });
   if (data.parametric) result.push({ iterator: iterateParametric(data.parametric, scope), output: data.parametric as AnyShapeOutput });
+  if (data.superformula) result.push({ iterator: iterateSuperformula(data.superformula, scope), output: data.superformula as AnyShapeOutput });
   // Not yet implemented
-  if (data.superformula) throw new Error('SuperformulaIterator not yet implemented');
   if (data.epitrochoid) throw new Error('EpitrochoidIterator not yet implemented');
   if (data.hypotrochoid) throw new Error('HypotrochoidIterator not yet implemented');
   if (data.fractal) throw new Error('FractalIterator not yet implemented');

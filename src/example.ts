@@ -325,3 +325,61 @@ const gridExample: SvgDef = {
 };
 
 output('grid', gridExample);
+
+// Superformula examples - various organic shapes
+const superformulaExample: SvgDef = {
+  size: [600, 200],
+
+  // Starfish shape (m=5)
+  path: [
+    {
+      superformula: {
+        cx: 100,
+        cy: 100,
+        scale: 80,
+        m: 5,
+        n1: 0.3,
+        n2: 0.3,
+        n3: 0.3
+      },
+      close: true,
+      fill: 'coral',
+      stroke: 'darkred',
+      strokeWidth: 2
+    },
+    // Flower shape (m=8)
+    {
+      superformula: {
+        cx: 300,
+        cy: 100,
+        scale: 80,
+        m: 8,
+        n1: 0.5,
+        n2: 4,
+        n3: 8
+      },
+      close: true,
+      fill: 'lightblue',
+      stroke: 'navy',
+      strokeWidth: 2
+    },
+    // Rounded square (m=4)
+    {
+      superformula: {
+        cx: 500,
+        cy: 100,
+        scale: 70,
+        m: 4,
+        n1: 2,
+        n2: 2,
+        n3: 2
+      },
+      close: true,
+      fill: 'lightgreen',
+      stroke: 'darkgreen',
+      strokeWidth: 2
+    }
+  ]
+};
+
+output('superformula', superformulaExample);
