@@ -1,7 +1,7 @@
 import type {
   SvgDef, LetBlock, PathData, CircleData, RectData, LineData, PolylineData, PolygonData, GroupData,
   ForIterator, GridIterator, SpiralIterator, LissajousIterator, RoseIterator, ParametricIterator,
-  SuperformulaIterator, EpitrochoidIterator, HypotrochoidIterator, FlowfieldIterator, AttractorIterator,
+  SuperformulaIterator, EpitrochoidIterator, HypotrochoidIterator, FlowfieldIterator, AttractorIterator, FractalIterator,
   ShapeOutput, ShapeIteratorProps, Scope
 } from './types.js';
 
@@ -706,6 +706,129 @@ function* iterateAttractor(data: AttractorIterator, parentScope: Record<string, 
   }
 }
 
+/** Iterate a fractal curve, yielding scope steps with x1, y1, x2, y2, depth, i (as points for path) */
+function* iterateFractal(data: FractalIterator, parentScope: Record<string, ScopeValue>): Generator<IteratorStep> {
+  const type = evalExpr(data.type, parentScope);
+  const startX = evalExpr(data.x, parentScope);
+  const startY = evalExpr(data.y, parentScope);
+  const length = evalExpr(data.length, parentScope);
+  const angleDeg = data.angle ? evalExpr(data.angle, parentScope) : 0;
+  const depth = evalExpr(data.depth, parentScope);
+
+  // Generate fractal points
+  const points: { x: number; y: number }[] = [];
+  
+  // L-system style generation using turtle graphics
+  interface TurtleState { x: number; y: number; angle: number }
+  
+  function generatePoints(type: string, x: number, y: number, len: number, angle: number, depth: number): { x: number; y: number }[] {
+    const pts: { x: number; y: number }[] = [{ x, y }];
+    const stack: TurtleState[] = [];
+    let turtle: TurtleState = { x, y, angle: angle * Math.PI / 180 };
+
+    function forward(distance: number) {
+      turtle.x += Math.cos(turtle.angle) * distance;
+      turtle.y += Math.sin(turtle.angle) * distance;
+      pts.push({ x: turtle.x, y: turtle.y });
+    }
+
+    function turn(degrees: number) {
+      turtle.angle += degrees * Math.PI / 180;
+    }
+
+    function push() {
+      stack.push({ ...turtle });
+    }
+
+    function pop() {
+      turtle = stack.pop()!;
+    }
+
+    // Generate L-system string
+    function lSystem(axiom: string, rules: Record<string, string>, iterations: number): string {
+      let result = axiom;
+      for (let i = 0; i < iterations; i++) {
+        result = result.split('').map(c => rules[c] || c).join('');
+      }
+      return result;
+    }
+
+    // Execute L-system commands
+    function execute(commands: string, segmentLength: number, turnAngle: number) {
+      for (const cmd of commands) {
+        switch (cmd) {
+          case 'F': case 'G': forward(segmentLength); break;
+          case '+': turn(turnAngle); break;
+          case '-': turn(-turnAngle); break;
+          case '[': push(); break;
+          case ']': pop(); pts.push({ x: turtle.x, y: turtle.y }); break;
+        }
+      }
+    }
+
+    const segLen = len / Math.pow(3, depth);
+
+    switch (type) {
+      case 'koch': {
+        const commands = lSystem('F', { 'F': 'F+F--F+F' }, depth);
+        execute(commands, segLen, 60);
+        break;
+      }
+      case 'dragon': {
+        const commands = lSystem('FX', { 'X': 'X+YF+', 'Y': '-FX-Y' }, depth);
+        execute(commands, len / Math.pow(1.41, depth), 90);
+        break;
+      }
+      case 'hilbert': {
+        const commands = lSystem('A', { 
+          'A': '-BF+AFA+FB-', 
+          'B': '+AF-BFB-FA+' 
+        }, depth);
+        execute(commands, len / (Math.pow(2, depth) - 1), 90);
+        break;
+      }
+      case 'sierpinski': {
+        const commands = lSystem('F-G-G', { 
+          'F': 'F-G+F+G-F', 
+          'G': 'GG' 
+        }, depth);
+        execute(commands, len / Math.pow(2, depth), 120);
+        break;
+      }
+      case 'levy': {
+        const commands = lSystem('F', { 'F': '+F--F+' }, depth);
+        execute(commands, len / Math.pow(1.41, depth), 45);
+        break;
+      }
+    }
+
+    return pts;
+  }
+
+  const fractalPoints = generatePoints(type, startX, startY, length, angleDeg, depth);
+  
+  // Yield each point (for path drawing)
+  for (let i = 0; i < fractalPoints.length; i++) {
+    const pt = fractalPoints[i];
+    const prevPt = i > 0 ? fractalPoints[i - 1] : pt;
+    const t = fractalPoints.length > 1 ? i / (fractalPoints.length - 1) : 0;
+    
+    const stepScope = {
+      x: pt.x,
+      y: pt.y,
+      x1: prevPt.x,
+      y1: prevPt.y,
+      x2: pt.x,
+      y2: pt.y,
+      depth,
+      t,
+      i
+    };
+    const innerScope = data.let ? createScope(data.let as AnyLetBlock, { ...parentScope, ...stepScope }) : stepScope;
+    yield { ...stepScope, ...innerScope };
+  }
+}
+
 /** Get iterator from point-based shape data */
 function getPointIterator(data: PathData | PolylineData | PolygonData, scope: Record<string, ScopeValue>): Generator<IteratorStep> | null {
   if (data.for) return iterateFor(data.for, scope);
@@ -719,8 +842,7 @@ function getPointIterator(data: PathData | PolylineData | PolygonData, scope: Re
   if (data.hypotrochoid) return iterateHypotrochoid(data.hypotrochoid, scope);
   if (data.flowfield) return iterateFlowfield(data.flowfield, scope);
   if (data.attractor) return iterateAttractor(data.attractor, scope);
-  // Not yet implemented
-  if (data.fractal) throw new Error('FractalIterator not yet implemented');
+  if (data.fractal) return iterateFractal(data.fractal, scope);
   return null;
 }
 
@@ -751,8 +873,8 @@ function getShapeIterators(data: ShapeIteratorProps, scope: Record<string, Scope
   if (data.hypotrochoid) result.push({ iterator: iterateHypotrochoid(data.hypotrochoid, scope), output: data.hypotrochoid as AnyShapeOutput });
   if (data.flowfield) result.push({ iterator: iterateFlowfield(data.flowfield, scope), output: data.flowfield as AnyShapeOutput });
   if (data.attractor) result.push({ iterator: iterateAttractor(data.attractor, scope), output: data.attractor as AnyShapeOutput });
+  if (data.fractal) result.push({ iterator: iterateFractal(data.fractal, scope), output: data.fractal as AnyShapeOutput });
   // Not yet implemented
-  if (data.fractal) throw new Error('FractalIterator not yet implemented');
   if (data.voronoi) throw new Error('VoronoiIterator not yet implemented');
   if (data.delaunay) throw new Error('DelaunayIterator not yet implemented');
   if (data.tile) throw new Error('TileIterator not yet implemented');

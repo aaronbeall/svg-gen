@@ -699,3 +699,99 @@ const halvorsenAttractor: SvgDef = {
 };
 
 output('attractor-halvorsen', halvorsenAttractor);
+
+// Fractal examples - L-system curves
+const kochCurve: SvgDef = {
+  size: [500, 200],
+  path: {
+    fractal: {
+      type: 'koch',
+      x: 50,
+      y: 150,
+      length: 400,
+      angle: 0,
+      depth: 4
+    },
+    fill: 'none',
+    stroke: 'steelblue',
+    strokeWidth: 1
+  }
+};
+
+output('fractal-koch', kochCurve);
+
+const dragonCurve: SvgDef = {
+  size: [500, 400],
+  path: {
+    fractal: {
+      type: 'dragon',
+      x: 200,
+      y: 250,
+      length: 300,
+      angle: 0,
+      depth: 12
+    },
+    fill: 'none',
+    stroke: 'crimson',
+    strokeWidth: 0.5
+  }
+};
+
+output('fractal-dragon', dragonCurve);
+
+const hilbertCurve: SvgDef = {
+  size: [400, 400],
+  path: {
+    fractal: {
+      type: 'hilbert',
+      x: 20,
+      y: 380,
+      length: 360,
+      angle: 0,
+      depth: 5
+    },
+    fill: 'none',
+    stroke: 'darkgreen',
+    strokeWidth: 1
+  }
+};
+
+output('fractal-hilbert', hilbertCurve);
+
+const sierpinskiCurve: SvgDef = {
+  size: [500, 450],
+  path: {
+    fractal: {
+      type: 'sierpinski',
+      x: 50,
+      y: 400,
+      length: 400,
+      angle: 0,
+      depth: 6
+    },
+    fill: 'none',
+    stroke: 'purple',
+    strokeWidth: 0.5
+  }
+};
+
+output('fractal-sierpinski', sierpinskiCurve);
+
+const levyCurve: SvgDef = {
+  size: [400, 400],
+  path: {
+    fractal: {
+      type: 'levy',
+      x: 100,
+      y: 300,
+      length: 200,
+      angle: 0,
+      depth: 12
+    },
+    fill: 'none',
+    stroke: 'darkorange',
+    strokeWidth: 0.5
+  }
+};
+
+output('fractal-levy', levyCurve);
