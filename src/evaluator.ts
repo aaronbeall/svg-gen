@@ -1,7 +1,7 @@
 import type {
   SvgDef, LetBlock, PathData, CircleData, RectData, LineData, PolylineData, PolygonData, GroupData,
   ForIterator, GridIterator, SpiralIterator, LissajousIterator, RoseIterator, ParametricIterator,
-  SuperformulaIterator, EpitrochoidIterator, HypotrochoidIterator,
+  SuperformulaIterator, EpitrochoidIterator, HypotrochoidIterator, FlowfieldIterator,
   ShapeOutput, ShapeIteratorProps, Scope
 } from './types.js';
 
@@ -545,6 +545,61 @@ function computeRevolutions(R: number, r: number): number {
   return r / gcd(Math.round(R), Math.round(r));
 }
 
+/** Iterate a flowfield, yielding scope steps with x, y, vx, vy, t, i for each point along each flow line */
+function* iterateFlowfield(data: FlowfieldIterator, parentScope: Record<string, ScopeValue>): Generator<IteratorStep> {
+  const steps = evalExpr(data.steps, parentScope);
+  const stepSize = data.stepSize ? evalExpr(data.stepSize, parentScope) : 1;
+
+  // Get starting points
+  let startPoints: { x: number; y: number }[] = [];
+  
+  if (Array.isArray(data.start)) {
+    // Explicit starting points
+    startPoints = data.start.map(p => ({
+      x: evalExpr(p.x, parentScope),
+      y: evalExpr(p.y, parentScope)
+    }));
+  } else {
+    // Grid of starting points
+    const cols = evalExpr(data.start.cols, parentScope);
+    const rows = evalExpr(data.start.rows, parentScope);
+    const width = evalExpr(data.start.width, parentScope);
+    const height = evalExpr(data.start.height, parentScope);
+    
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        startPoints.push({
+          x: (col + 0.5) * (width / cols),
+          y: (row + 0.5) * (height / rows)
+        });
+      }
+    }
+  }
+
+  let i = 0;
+  const totalSteps = startPoints.length * steps;
+
+  // For each starting point, follow the flow
+  for (const start of startPoints) {
+    let x = start.x;
+    let y = start.y;
+
+    for (let step = 0; step < steps; step++) {
+      const t = totalSteps > 1 ? i / (totalSteps - 1) : 0;
+      const [vx, vy] = data.field({ ...parentScope, x, y });
+
+      const stepScope = { x, y, vx, vy, t, i };
+      const innerScope = data.let ? createScope(data.let as AnyLetBlock, { ...parentScope, ...stepScope }) : stepScope;
+      yield { ...stepScope, ...innerScope };
+
+      // Move to next position
+      x += vx * stepSize;
+      y += vy * stepSize;
+      i++;
+    }
+  }
+}
+
 /** Get iterator from point-based shape data */
 function getPointIterator(data: PathData | PolylineData | PolygonData, scope: Record<string, ScopeValue>): Generator<IteratorStep> | null {
   if (data.for) return iterateFor(data.for, scope);
@@ -556,10 +611,10 @@ function getPointIterator(data: PathData | PolylineData | PolygonData, scope: Re
   if (data.superformula) return iterateSuperformula(data.superformula, scope);
   if (data.epitrochoid) return iterateEpitrochoid(data.epitrochoid, scope);
   if (data.hypotrochoid) return iterateHypotrochoid(data.hypotrochoid, scope);
+  if (data.flowfield) return iterateFlowfield(data.flowfield, scope);
   // Not yet implemented
   if (data.fractal) throw new Error('FractalIterator not yet implemented');
   if (data.attractor) throw new Error('AttractorIterator not yet implemented');
-  if (data.flowfield) throw new Error('FlowfieldIterator not yet implemented');
   return null;
 }
 
@@ -588,10 +643,10 @@ function getShapeIterators(data: ShapeIteratorProps, scope: Record<string, Scope
   if (data.superformula) result.push({ iterator: iterateSuperformula(data.superformula, scope), output: data.superformula as AnyShapeOutput });
   if (data.epitrochoid) result.push({ iterator: iterateEpitrochoid(data.epitrochoid, scope), output: data.epitrochoid as AnyShapeOutput });
   if (data.hypotrochoid) result.push({ iterator: iterateHypotrochoid(data.hypotrochoid, scope), output: data.hypotrochoid as AnyShapeOutput });
+  if (data.flowfield) result.push({ iterator: iterateFlowfield(data.flowfield, scope), output: data.flowfield as AnyShapeOutput });
   // Not yet implemented
   if (data.fractal) throw new Error('FractalIterator not yet implemented');
   if (data.attractor) throw new Error('AttractorIterator not yet implemented');
-  if (data.flowfield) throw new Error('FlowfieldIterator not yet implemented');
   if (data.voronoi) throw new Error('VoronoiIterator not yet implemented');
   if (data.delaunay) throw new Error('DelaunayIterator not yet implemented');
   if (data.tile) throw new Error('TileIterator not yet implemented');

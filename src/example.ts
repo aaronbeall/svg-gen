@@ -421,3 +421,185 @@ const spirographExample: SvgDef = {
 };
 
 output('spirograph', spirographExample);
+
+// Flowfield example - particles following a vector field
+const flowfieldExample: SvgDef = {
+  size: [400, 400],
+
+  // Use a grid iterator to create multiple flow lines
+  for: {
+    i: 0,
+    to: 20,
+    let: {
+      startX: $ => 20 + ($.i % 5) * 90,
+      startY: $ => 20 + Math.floor($.i / 5) * 90
+    },
+    path: {
+      flowfield: {
+        field: $ => {
+          // Swirling field based on position
+          const angle = Math.atan2($.y - 200, $.x - 200) + Math.PI / 2;
+          const dist = Math.sqrt(($.x - 200) ** 2 + ($.y - 200) ** 2);
+          const strength = 0.5 + dist / 400;
+          return [Math.cos(angle) * strength, Math.sin(angle) * strength];
+        },
+        start: [{ x: $ => $.startX, y: $ => $.startY }],
+        steps: 100,
+        stepSize: 3
+      },
+      fill: 'none',
+      stroke: ($: any) => `hsl(${$.i * 18}, 70%, 50%)`,
+      strokeWidth: 1.5
+    }
+  }
+};
+
+output('flowfield', flowfieldExample);
+
+// Flowfield example 2 - Perlin-like noise field using sine waves
+const flowfieldNoise: SvgDef = {
+  size: [500, 500],
+
+  for: {
+    i: 0,
+    to: 100,
+    let: {
+      startX: $ => ($.i % 10) * 50 + 25,
+      startY: $ => Math.floor($.i / 10) * 50 + 25
+    },
+    path: {
+      flowfield: {
+        field: $ => {
+          // Pseudo-noise using overlapping sine waves
+          const scale = 0.02;
+          const angle = Math.sin($.x * scale) * Math.cos($.y * scale) * Math.PI * 2;
+          return [Math.cos(angle), Math.sin(angle)];
+        },
+        start: [{ x: $ => $.startX, y: $ => $.startY }],
+        steps: 50,
+        stepSize: 4
+      },
+      fill: 'none',
+      stroke: ($: any) => `hsla(${200 + $.i * 1.5}, 60%, 50%, 0.6)`,
+      strokeWidth: 1
+    }
+  }
+};
+
+output('flowfield-noise', flowfieldNoise);
+
+// Flowfield example 3 - Sink/source field (converging to center)
+const flowfieldSink: SvgDef = {
+  size: [400, 400],
+
+  for: {
+    i: 0,
+    to: 36,
+    let: {
+      // Start points in a circle around the edge
+      angle: $ => ($.i / 36) * Math.PI * 2,
+      startX: $ => 200 + Math.cos($.angle) * 180,
+      startY: $ => 200 + Math.sin($.angle) * 180
+    },
+    path: {
+      flowfield: {
+        field: $ => {
+          // Point toward center with slight spiral
+          const dx = 200 - $.x;
+          const dy = 200 - $.y;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const spiral = 0.3;
+          return [
+            (dx / dist) + (-dy / dist) * spiral,
+            (dy / dist) + (dx / dist) * spiral
+          ];
+        },
+        start: [{ x: $ => $.startX, y: $ => $.startY }],
+        steps: 80,
+        stepSize: 2
+      },
+      fill: 'none',
+      stroke: ($: any) => `hsl(${$.i * 10}, 70%, 50%)`,
+      strokeWidth: 2
+    }
+  }
+};
+
+output('flowfield-sink', flowfieldSink);
+
+// Flowfield example 4 - Dipole field (two poles)
+const flowfieldDipole: SvgDef = {
+  size: [500, 400],
+
+  for: {
+    i: 0,
+    to: 40,
+    let: {
+      startX: $ => 20,
+      startY: $ => 10 + $.i * 10
+    },
+    path: {
+      flowfield: {
+        field: $ => {
+          // Two poles - one positive (source), one negative (sink)
+          const p1 = { x: 150, y: 200 }; // source
+          const p2 = { x: 350, y: 200 }; // sink
+          
+          const dx1 = $.x - p1.x, dy1 = $.y - p1.y;
+          const dx2 = $.x - p2.x, dy2 = $.y - p2.y;
+          const d1 = Math.sqrt(dx1 * dx1 + dy1 * dy1) || 1;
+          const d2 = Math.sqrt(dx2 * dx2 + dy2 * dy2) || 1;
+          
+          // Repel from p1, attract to p2
+          const strength = 50;
+          return [
+            (dx1 / d1) * (strength / d1) - (dx2 / d2) * (strength / d2),
+            (dy1 / d1) * (strength / d1) - (dy2 / d2) * (strength / d2)
+          ];
+        },
+        start: [{ x: $ => $.startX, y: $ => $.startY }],
+        steps: 150,
+        stepSize: 2
+      },
+      fill: 'none',
+      stroke: ($: any) => `hsl(${180 + $.startY * 0.4}, 60%, 50%)`,
+      strokeWidth: 1.5
+    }
+  }
+};
+
+output('flowfield-dipole', flowfieldDipole);
+
+// Flowfield example 5 - Turbulent field
+const flowfieldTurbulent: SvgDef = {
+  size: [500, 500],
+
+  for: {
+    i: 0,
+    to: 64,
+    let: {
+      startX: $ => ($.i % 8) * 62.5 + 31,
+      startY: $ => Math.floor($.i / 8) * 62.5 + 31
+    },
+    path: {
+      flowfield: {
+        field: $ => {
+          // Multiple frequency sine waves for turbulence
+          const a1 = Math.sin($.x * 0.03) + Math.sin($.y * 0.02);
+          const a2 = Math.cos($.x * 0.05 + $.y * 0.03) * 0.5;
+          const a3 = Math.sin(($.x + $.y) * 0.04) * 0.3;
+          const angle = (a1 + a2 + a3) * Math.PI;
+          return [Math.cos(angle), Math.sin(angle)];
+        },
+        start: [{ x: $ => $.startX, y: $ => $.startY }],
+        steps: 60,
+        stepSize: 3
+      },
+      fill: 'none',
+      stroke: ($: any) => `hsla(${280 + $.i * 1.2}, 70%, 55%, 0.7)`,
+      strokeWidth: 1.2
+    }
+  }
+};
+
+output('flowfield-turbulent', flowfieldTurbulent);
