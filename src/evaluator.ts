@@ -3,7 +3,7 @@ import type {
   ForIterator, GridIterator, SpiralIterator, LissajousIterator, RoseIterator, ParametricIterator,
   SuperformulaIterator, EpitrochoidIterator, HypotrochoidIterator, FlowfieldIterator, AttractorIterator,
   FractalIterator, VoronoiIterator, DelaunayIterator, TileIterator, PackIterator, RandomIterator, PoissonIterator,
-  ShapeOutput, ShapeIteratorProps, Scope
+  ShapeOutput, ShapeIteratorProps, Scope, Collect
 } from './types.js';
 
 // Runtime types - evaluator uses base Scope for runtime flexibility
@@ -560,7 +560,7 @@ function* iterateFlowfield(data: FlowfieldIterator, parentScope: Record<string, 
 
   // Get starting points
   let startPoints: { x: number; y: number }[] = [];
-  
+
   if (Array.isArray(data.start)) {
     // Explicit starting points
     startPoints = data.start.map(p => ({
@@ -573,7 +573,7 @@ function* iterateFlowfield(data: FlowfieldIterator, parentScope: Record<string, 
     const rows = evalExpr(data.start.rows, parentScope);
     const width = evalExpr(data.start.width, parentScope);
     const height = evalExpr(data.start.height, parentScope);
-    
+
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
         startPoints.push({
@@ -616,7 +616,7 @@ function* iterateAttractor(data: AttractorIterator, parentScope: Record<string, 
   const scale = data.scale ? evalExpr(data.scale, parentScope) : 1;
   const iterations = evalExpr(data.iterations, parentScope);
   const dt = data.dt ? evalExpr(data.dt, parentScope) : 0.01;
-  
+
   // Get attractor-specific parameters with defaults
   const params: Record<string, number> = {};
   if (data.params) {
@@ -695,7 +695,7 @@ function* iterateAttractor(data: AttractorIterator, parentScope: Record<string, 
   // Generate points
   for (let i = 0; i < iterations; i++) {
     const t = iterations > 1 ? i / (iterations - 1) : 0;
-    
+
     const stepScope = {
       x: cx + x * scale,
       y: cy + y * scale,
@@ -725,10 +725,10 @@ function* iterateFractal(data: FractalIterator, parentScope: Record<string, Scop
 
   // Generate fractal points
   const points: { x: number; y: number }[] = [];
-  
+
   // L-system style generation using turtle graphics
   interface TurtleState { x: number; y: number; angle: number }
-  
+
   function generatePoints(type: string, x: number, y: number, len: number, angle: number, depth: number): { x: number; y: number }[] {
     const pts: { x: number; y: number }[] = [{ x, y }];
     const stack: TurtleState[] = [];
@@ -788,17 +788,17 @@ function* iterateFractal(data: FractalIterator, parentScope: Record<string, Scop
         break;
       }
       case 'hilbert': {
-        const commands = lSystem('A', { 
-          'A': '-BF+AFA+FB-', 
-          'B': '+AF-BFB-FA+' 
+        const commands = lSystem('A', {
+          'A': '-BF+AFA+FB-',
+          'B': '+AF-BFB-FA+'
         }, depth);
         execute(commands, len / (Math.pow(2, depth) - 1), 90);
         break;
       }
       case 'sierpinski': {
-        const commands = lSystem('F-G-G', { 
-          'F': 'F-G+F+G-F', 
-          'G': 'GG' 
+        const commands = lSystem('F-G-G', {
+          'F': 'F-G+F+G-F',
+          'G': 'GG'
         }, depth);
         execute(commands, len / Math.pow(2, depth), 120);
         break;
@@ -814,13 +814,13 @@ function* iterateFractal(data: FractalIterator, parentScope: Record<string, Scop
   }
 
   const fractalPoints = generatePoints(type, startX, startY, length, angleDeg, depth);
-  
+
   // Yield each point (for path drawing)
   for (let i = 0; i < fractalPoints.length; i++) {
     const pt = fractalPoints[i];
     const prevPt = i > 0 ? fractalPoints[i - 1] : pt;
     const t = fractalPoints.length > 1 ? i / (fractalPoints.length - 1) : 0;
-    
+
     const stepScope = {
       x: pt.x,
       y: pt.y,
@@ -849,7 +849,7 @@ function computeVoronoi(
   // For each site, find its Voronoi cell by sampling
   for (const site of sites) {
     const cellPoints: Set<string> = new Set();
-    
+
     // Sample grid points and find which belong to this cell
     for (let py = by; py <= by + height; py += resolution) {
       for (let px = bx; px <= bx + width; px += resolution) {
@@ -922,13 +922,26 @@ function convexHull(points: [number, number][]): [number, number][] {
   return hull;
 }
 
+/** Evaluate points expression - handles static array, array with expressions, or expression */
+function evalPointsExpr(points: unknown, scope: Record<string, ScopeValue>): { x: number; y: number }[] {
+  if (typeof points === 'function') {
+    // Expression returning [number, number][]
+    const result = (points as Function)(scope) as [number, number][];
+    return result.map(([x, y]) => ({ x, y }));
+  } else if (Array.isArray(points)) {
+    // Array of [Expr, Expr] tuples
+    return points.map(([xExpr, yExpr]) => ({
+      x: evalExpr(xExpr, scope),
+      y: evalExpr(yExpr, scope)
+    }));
+  }
+  return [];
+}
+
 /** Iterate Voronoi cells, yielding scope steps with x, y (center), vertices, i */
 function* iterateVoronoi(data: VoronoiIterator, parentScope: Record<string, ScopeValue>): Generator<IteratorStep> {
   // Evaluate seed points
-  const sites = data.points.map(([xExpr, yExpr]) => ({
-    x: evalExpr(xExpr, parentScope),
-    y: evalExpr(yExpr, parentScope)
-  }));
+  const sites = evalPointsExpr(data.points, parentScope);
 
   // Get bounds (default to bounding box of points with padding)
   let bounds: { x: number; y: number; width: number; height: number };
@@ -1014,7 +1027,7 @@ function computeDelaunay(points: { x: number; y: number }[]): { x1: number; y1: 
   // Add points one at a time
   for (const point of points) {
     const badTriangles: Triangle[] = [];
-    
+
     for (const tri of triangles) {
       if (circumcircleContains(tri, point)) {
         badTriangles.push(tri);
@@ -1058,7 +1071,7 @@ function computeDelaunay(points: { x: number; y: number }[]): { x1: number; y1: 
   }
 
   // Remove triangles that share vertices with super-triangle
-  triangles = triangles.filter(tri => 
+  triangles = triangles.filter(tri =>
     tri.p1 !== p1 && tri.p1 !== p2 && tri.p1 !== p3 &&
     tri.p2 !== p1 && tri.p2 !== p2 && tri.p2 !== p3 &&
     tri.p3 !== p1 && tri.p3 !== p2 && tri.p3 !== p3
@@ -1073,10 +1086,8 @@ function computeDelaunay(points: { x: number; y: number }[]): { x1: number; y1: 
 
 /** Iterate Delaunay triangles, yielding scope steps with x1,y1,x2,y2,x3,y3, cx,cy, i */
 function* iterateDelaunay(data: DelaunayIterator, parentScope: Record<string, ScopeValue>): Generator<IteratorStep> {
-  const points = data.points.map(([xExpr, yExpr]) => ({
-    x: evalExpr(xExpr, parentScope),
-    y: evalExpr(yExpr, parentScope)
-  }));
+  // Evaluate points
+  const points = evalPointsExpr(data.points, parentScope);
 
   const triangles = computeDelaunay(points);
 
@@ -1504,15 +1515,14 @@ function pushElements(elements: EvalElement[], result: EvalElement | EvalElement
 function evalGenerators(props: ShapeOutput, scope: Record<string, ScopeValue>): EvalElement[] {
   const elements: EvalElement[] = [];
 
-  // Point-based shapes (have their own iterators for points)
-  for (const p of toArray(props.path)) elements.push(evalPath(p, scope));
-  for (const pl of toArray(props.polyline)) elements.push(evalPolyline(pl, scope));
-  for (const pg of toArray(props.polygon)) elements.push(evalPolygon(pg, scope));
-
-  // Fixed shapes (no iterators - use group iterators for multiples)
-  for (const c of toArray(props.circle)) elements.push(evalCircle(c, scope));
-  for (const r of toArray(props.rect)) elements.push(evalRect(r, scope));
-  for (const l of toArray(props.line)) elements.push(evalLine(l, scope));
+  if (props.path) elements.push(evalPath(props.path, scope));
+  if (props.polyline) elements.push(evalPolyline(props.polyline, scope));
+  if (props.polygon) elements.push(evalPolygon(props.polygon, scope));
+  if (props.circle) elements.push(evalCircle(props.circle, scope));
+  if (props.rect) elements.push(evalRect(props.rect, scope));
+  if (props.line) elements.push(evalLine(props.line, scope));
+  if (props.collect) elements.push(...evalCollect(props.collect, scope));
+  if (props.group && props.group.length > 0) elements.push(evalGroupArray(props.group, scope));
 
   return elements;
 }
@@ -1522,29 +1532,115 @@ function toArray<T>(item: T | T[] | undefined): T[] {
   return Array.isArray(item) ? item : [item];
 }
 
-/** Evaluate shapes from iterator output (handles OneOrMany) */
+/** Evaluate shapes from iterator output */
 function evalIteratorShapes(output: ShapeOutput, scope: Record<string, ScopeValue>): EvalElement[] {
   const elements: EvalElement[] = [];
-  for (const c of toArray(output.circle)) elements.push(evalCircle(c, scope));
-  for (const r of toArray(output.rect)) elements.push(evalRect(r, scope));
-  for (const l of toArray(output.line)) elements.push(evalLine(l, scope));
-  for (const p of toArray(output.path)) elements.push(evalPath(p, scope));
-  for (const pl of toArray(output.polyline)) elements.push(evalPolyline(pl, scope));
-  for (const pg of toArray(output.polygon)) elements.push(evalPolygon(pg, scope));
-  for (const g of toArray(output.group)) elements.push(evalGroup(g, scope));
+  if (output.circle) elements.push(evalCircle(output.circle, scope));
+  if (output.rect) elements.push(evalRect(output.rect, scope));
+  if (output.line) elements.push(evalLine(output.line, scope));
+  if (output.path) elements.push(evalPath(output.path, scope));
+  if (output.polyline) elements.push(evalPolyline(output.polyline, scope));
+  if (output.polygon) elements.push(evalPolygon(output.polygon, scope));
+  if (output.collect) elements.push(...evalCollect(output.collect, scope));
+  if (output.group && output.group.length > 0) elements.push(evalGroupArray(output.group, scope));
   return elements;
 }
 
-/** Evaluate a group, handling both static shapes and shape iterators */
+/**
+ * Evaluate a collect block - runs the source iterator, accumulates points,
+ * then evaluates the output shapes/iterators with the collected points in scope.
+ */
+function evalCollect(collectData: Collect, parentScope: Record<string, ScopeValue>): EvalElement[] {
+  // Get all iterators from the 'from' source
+  const sourceIterators = getShapeIterators(collectData.points, parentScope);
+
+  // Collect all points from all source iterators
+  const points: [number, number][] = [];
+  for (const { iterator } of sourceIterators) {
+    for (const step of iterator) {
+      if (typeof step.x === 'number' && typeof step.y === 'number') {
+        points.push([step.x, step.y]);
+      }
+    }
+  }
+
+  // Create scope with collected points
+  const collectScope: Record<string, ScopeValue> = {
+    ...parentScope,
+    points,
+    count: points.length
+  };
+
+  // Apply let block if present
+  const finalScope = collectData.let
+    ? createScope(collectData.let as AnyLetBlock, collectScope)
+    : collectScope;
+
+  // Evaluate output shapes and iterators with the collected points in scope
+  const elements: EvalElement[] = [];
+
+  // Evaluate static shapes (cast to AnyShapeOutput for runtime flexibility)
+  elements.push(...evalGenerators(collectData as unknown as AnyShapeOutput, finalScope));
+
+  // Handle voronoi/delaunay specifically (they're on Collect, not ShapeIteratorProps)
+  if (collectData.voronoi) {
+    const voronoiIterator = iterateVoronoi(collectData.voronoi as unknown as VoronoiIterator, finalScope);
+    const voronoiOutput = collectData.voronoi as unknown as AnyShapeOutput;
+    for (const step of voronoiIterator) {
+      const stepScope = { ...finalScope, ...step };
+      elements.push(...evalIteratorShapes(voronoiOutput, stepScope));
+    }
+  }
+
+  if (collectData.delaunay) {
+    const delaunayIterator = iterateDelaunay(collectData.delaunay as unknown as DelaunayIterator, finalScope);
+    const delaunayOutput = collectData.delaunay as unknown as AnyShapeOutput;
+    for (const step of delaunayIterator) {
+      const stepScope = { ...finalScope, ...step };
+      elements.push(...evalIteratorShapes(delaunayOutput, stepScope));
+    }
+  }
+
+  return elements;
+}
+
+/** Evaluate a group array - creates a single group containing all children */
+function evalGroupArray(groupArray: GroupData[], parentScope: Record<string, ScopeValue>): EvalGroup {
+  const children: EvalElement[] = [];
+
+  for (const groupData of groupArray) {
+    const groupScope = groupData.let ? createScope(groupData.let, parentScope) : parentScope;
+
+    // Evaluate static shapes from this group data
+    children.push(...evalGenerators(groupData, groupScope));
+
+    // Recursively evaluate nested groups
+    if (groupData.group && groupData.group.length > 0) {
+      children.push(evalGroupArray(groupData.group, groupScope));
+    }
+
+    // Evaluate all shape iterators
+    const iterators = getShapeIterators(groupData, groupScope);
+    children.push(...evalShapeIterators(iterators, groupScope));
+  }
+
+  return {
+    type: 'group',
+    transform: null,
+    children
+  };
+}
+
+/** Evaluate a single group, handling both static shapes and shape iterators */
 function evalGroup(groupData: GroupData, parentScope: Record<string, ScopeValue>): EvalGroup {
   const groupScope = groupData.let ? createScope(groupData.let, parentScope) : parentScope;
-  
+
   // Evaluate static shapes
   const children = evalGenerators(groupData, groupScope);
 
   // Recursively evaluate nested groups
-  for (const nestedGroup of toArray(groupData.group)) {
-    children.push(evalGroup(nestedGroup, groupScope));
+  if (groupData.group && groupData.group.length > 0) {
+    children.push(evalGroupArray(groupData.group, groupScope));
   }
 
   // Evaluate all shape iterators
@@ -1561,14 +1657,9 @@ function evalGroup(groupData: GroupData, parentScope: Record<string, ScopeValue>
 export function evaluate(svg: SvgDef): EvalSvg {
   const [width, height] = svg.size;
   const scope = createScope(svg.let);
-  
-  // Evaluate static shapes
-  const elements: EvalElement[] = evalGenerators(svg, scope);
 
-  // Handle groups
-  for (const groupData of toArray(svg.group)) {
-    elements.push(evalGroup(groupData, scope));
-  }
+  // Evaluate static shapes (including group)
+  const elements: EvalElement[] = evalGenerators(svg, scope);
 
   // Handle all iterators at SvgDef level
   const iterators = getShapeIterators(svg, scope);

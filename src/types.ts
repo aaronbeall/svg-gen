@@ -125,10 +125,10 @@ export interface InlineModifiers {
 // ============================================================================
 
 /** Common style properties for rendered elements */
-export interface StyleProps {
-  fill?: Expr<string>;
-  stroke?: Expr<string>;
-  strokeWidth?: Expr<number>;
+export interface StyleProps<S extends Scope = Scope> {
+  fill?: Expr<string, S>;
+  stroke?: Expr<string, S>;
+  strokeWidth?: Expr<number, S>;
 }
 
 // ============================================================================
@@ -202,6 +202,9 @@ export type PoissonIteratorScope = Scope & { x: number; y: number; t: number; i:
 /** Grid iterator provides x, y, row, col, i, t */
 export type GridIteratorScope = Scope & { x: number; y: number; row: number; col: number; i: number; t: number };
 
+/** Collect scope provides points array and count */
+export type CollectScope = Scope & { points: [number, number][]; count: number };
+
 // ============================================================================
 // Iterator Types (provide scope variables at each step)
 // ============================================================================
@@ -231,7 +234,7 @@ export interface GridIterator extends ScopeProps<GridIteratorScope> {
 }
 
 /** Spiral iterator - provides x, y, t, theta, r, i in scope */
-export interface SpiralIterator extends ScopeProps<SpiralIteratorScope> {
+export interface SpiralIterator extends ScopeProps<SpiralIteratorScope>, ShapeOutput<SpiralIteratorScope> {
   cx: Expr<number>;
   cy: Expr<number>;
   startRadius: Expr<number>;
@@ -362,18 +365,21 @@ export interface FractalIterator extends ScopeProps<FractalIteratorScope> {
   depth: Expr<number>;
 }
 
+/** Points can be: static array, array with expressions, or expression returning array */
+export type PointsExpr<S extends Scope = Scope> = Expr<[number, number][], S> | [Expr<number, S>, Expr<number, S>][];
+
 /** Voronoi iterator - iterates over Voronoi cells from seed points */
-export interface VoronoiIterator extends ScopeProps<VoronoiIteratorScope> {
-  /** Seed points */
-  points: [Expr<number>, Expr<number>][];
+export interface VoronoiIterator<S extends Scope = Scope> extends ScopeProps<VoronoiIteratorScope> {
+  /** Seed points - static array, array with expressions, or expression returning points */
+  points: PointsExpr<S>;
   /** Bounding box */
   bounds?: { x: Expr<number>; y: Expr<number>; width: Expr<number>; height: Expr<number> };
 }
 
 /** Delaunay iterator - iterates over Delaunay triangles from points */
-export interface DelaunayIterator extends ScopeProps<DelaunayIteratorScope> {
-  /** Input points */
-  points: [Expr<number>, Expr<number>][];
+export interface DelaunayIterator<S extends Scope = Scope> extends ScopeProps<DelaunayIteratorScope> {
+  /** Input points - static array, array with expressions, or expression returning points */
+  points: PointsExpr<S>;
 }
 
 /** Tile iterator - regular tiling patterns */
@@ -437,6 +443,23 @@ export interface PoissonIterator extends ScopeProps<PoissonIteratorScope> {
 }
 
 // ============================================================================
+// Collect - accumulates iterator points into an array for batch consumers
+// ============================================================================
+
+/**
+ * Collect runs an iterator and accumulates all [x, y] points into an array,
+ * then provides that array as `points` in scope for consumers like Voronoi/Delaunay.
+ */
+export interface Collect extends ShapeOutput<CollectScope>, ScopeProps<CollectScope> {
+  /** Source iterator that produces x, y coordinates */
+  points: ShapeIteratorProps;
+  /** Voronoi iterator with access to collected points */
+  voronoi?: VoronoiIterator<CollectScope> & ShapeOutput<VoronoiIteratorScope>;
+  /** Delaunay iterator with access to collected points */
+  delaunay?: DelaunayIterator<CollectScope> & ShapeOutput<DelaunayIteratorScope>;
+}
+
+// ============================================================================
 // Iterator Output Types (what iterators produce)
 // ============================================================================
 
@@ -448,15 +471,16 @@ export interface PointOutput<S extends Scope = Scope> {
 
 /** Shape output for iterators and groups */
 export interface ShapeOutput<S extends Scope = Scope> {
-  // Basic primitives
-  circle?: OneOrMany<CircleData<S>>;
-  rect?: OneOrMany<RectData<S>>;
-  line?: OneOrMany<LineData<S>>;
-  path?: OneOrMany<PathData>;
-  polyline?: OneOrMany<PolylineData>;
-  polygon?: OneOrMany<PolygonData>;
-  /** Nested groups and shapes */
-  group?: OneOrMany<GroupData>;
+  circle?: CircleData<S>;
+  rect?: RectData<S>;
+  line?: LineData<S>;
+  path?: PathData<S>;
+  polyline?: PolylineData<S>;
+  polygon?: PolygonData<S>;
+  /** Nested groups */
+  group?: GroupData[];
+  /** Collect iterator points into array for batch consumers */
+  collect?: Collect;
 }
 
 // ============================================================================
@@ -498,30 +522,30 @@ export interface DirectPoints<S extends Scope = Scope> {
 }
 
 /** Path from points */
-export interface PathData<S extends Scope = Scope> extends PointIteratorProps, DirectPoints<S>, StyleProps, InlineModifiers {
+export interface PathData<S extends Scope = Scope> extends PointIteratorProps, DirectPoints<S>, StyleProps<S>, InlineModifiers {
   /** Close the path */
   close?: boolean;
 }
 
 /** Polyline from points */
-export interface PolylineData<S extends Scope = Scope> extends PointIteratorProps, DirectPoints<S>, StyleProps, InlineModifiers {}
+export interface PolylineData<S extends Scope = Scope> extends PointIteratorProps, DirectPoints<S>, StyleProps<S>, InlineModifiers {}
 
 /** Polygon from points */
-export interface PolygonData<S extends Scope = Scope> extends PointIteratorProps, DirectPoints<S>, StyleProps, InlineModifiers {}
+export interface PolygonData<S extends Scope = Scope> extends PointIteratorProps, DirectPoints<S>, StyleProps<S>, InlineModifiers {}
 
 // ============================================================================
 // Fixed Shapes (no iterators - use container iterators to produce multiples)
 // ============================================================================
 
 /** Circle - single circle, use group iterator for multiples */
-export interface CircleData<S extends Scope = Scope> extends StyleProps {
+export interface CircleData<S extends Scope = Scope> extends StyleProps<S> {
   cx: Expr<number, S>;
   cy: Expr<number, S>;
   r: Expr<number, S>;
 }
 
 /** Rectangle - single rect, use group iterator for multiples */
-export interface RectData<S extends Scope = Scope> extends StyleProps {
+export interface RectData<S extends Scope = Scope> extends StyleProps<S> {
   x: Expr<number, S>;
   y: Expr<number, S>;
   width: Expr<number, S>;
@@ -529,7 +553,7 @@ export interface RectData<S extends Scope = Scope> extends StyleProps {
 }
 
 /** Line - single line, use group iterator for multiples */
-export interface LineData<S extends Scope = Scope> extends Omit<StyleProps, 'fill'> {
+export interface LineData<S extends Scope = Scope> extends Omit<StyleProps<S>, 'fill'> {
   x1: Expr<number, S>;
   y1: Expr<number, S>;
   x2: Expr<number, S>;
@@ -614,7 +638,7 @@ export interface ShapeIteratorProps {
   /** For loop iterator */
   for?: ForIterator & ShapeOutput<ForIteratorScope>;
   /** Spiral iterator */
-  spiral?: SpiralIterator & ShapeOutput<SpiralIteratorScope>;
+  spiral?: SpiralIterator;
   /** Lissajous iterator */
   lissajous?: LissajousIterator & ShapeOutput<LissajousIteratorScope>;
   /** Rose iterator */

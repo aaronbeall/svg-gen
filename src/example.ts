@@ -236,7 +236,7 @@ const circlesOnSpiral: SvgDef = {
       cx: $ => $.x,  // x from spiral iterator
       cy: $ => $.y,  // y from spiral iterator
       r: $ => 5 + $.t * 15,  // radius grows with t (0-1)
-      fill: ($: any) => `hsl(${$.t * 360}, 70%, 50%)`,
+      fill: $ => `hsl(${$.t * 360}, 70%, 50%)`,
       stroke: 'none'
     }
   }
@@ -253,54 +253,62 @@ const groupIterator: SvgDef = {
     cy: 200
   },
 
-  group: {
-    rect: {
-      x: 100,
-      y: 100,
-      width: 200,
-      height: 200,
-      fill: 'none',
-      stroke: 'black',
-      strokeWidth: 2
+  group: [
+    {
+      rect: {
+        x: 100,
+        y: 100,
+        width: 200,
+        height: 200,
+        fill: 'none',
+        stroke: 'black',
+        strokeWidth: 2
+      }
     },
-    circle: {
-      cx: $ => $.cx,
-      cy: $ => $.cy,
-      r: 8,
-      fill: 'coral',
-      stroke: 'darkred'
-    },
-    for: {
-      i: 0,
-      to: 20,
-      let: {
-        r: $ => 8 + $.i * 2
-      },
+    {
       circle: {
         cx: $ => $.cx,
         cy: $ => $.cy,
-        r: $ => $.r,
-        fill: 'coral',
-        stroke: 'darkred'
-      }
-    },
-    spiral: {
-      cx: $ => $.cx,
-      cy: $ => $.cy,
-      startRadius: 40,
-      endRadius: 150,
-      turns: 2,
-      samples: 20,
-      // circle is inside spiral iterator
-      circle: {
-        cx: $ => $.x,
-        cy: $ => $.y,
         r: 8,
         fill: 'coral',
         stroke: 'darkred'
       }
+    },
+    {
+      for: {
+        i: 0,
+        to: 20,
+        let: {
+          r: $ => 8 + $.i * 2
+        },
+        circle: {
+          cx: $ => $.cx,
+          cy: $ => $.cy,
+          r: $ => $.r,
+          fill: 'coral',
+          stroke: 'darkred'
+        }
+      }
+    },
+    {
+      spiral: {
+        cx: $ => $.cx,
+        cy: $ => $.cy,
+        startRadius: 40,
+        endRadius: 150,
+        turns: 2,
+        samples: 20,
+        // circle is inside spiral iterator
+        circle: {
+          cx: $ => $.x,
+          cy: $ => $.y,
+          r: 8,
+          fill: 'coral',
+          stroke: 'darkred'
+        }
+      }
     }
-  }
+  ]
 };
 
 output('group-iterator', groupIterator);
@@ -318,7 +326,7 @@ const gridExample: SvgDef = {
       cx: $ => $.x,
       cy: $ => $.y,
       r: $ => 10 + $.t * 10,
-      fill: ($: any) => `hsl(${$.col * 45}, 70%, ${50 + $.row * 5}%)`,
+      fill: $ => `hsl(${$.col * 45}, 70%, ${50 + $.row * 5}%)`,
       stroke: 'none'
     }
   }
@@ -330,54 +338,60 @@ output('grid', gridExample);
 const superformulaExample: SvgDef = {
   size: [600, 200],
 
-  // Starfish shape (m=5)
-  path: [
+  group: [
+    // Starfish shape (m=5)
     {
-      superformula: {
-        cx: 100,
-        cy: 100,
-        scale: 80,
-        m: 5,
-        n1: 0.3,
-        n2: 0.3,
-        n3: 0.3
-      },
-      close: true,
-      fill: 'coral',
-      stroke: 'darkred',
-      strokeWidth: 2
+      path: {
+        superformula: {
+          cx: 100,
+          cy: 100,
+          scale: 80,
+          m: 5,
+          n1: 0.3,
+          n2: 0.3,
+          n3: 0.3
+        },
+        close: true,
+        fill: 'coral',
+        stroke: 'darkred',
+        strokeWidth: 2
+      }
     },
     // Flower shape (m=8)
     {
-      superformula: {
-        cx: 300,
-        cy: 100,
-        scale: 80,
-        m: 8,
-        n1: 0.5,
-        n2: 4,
-        n3: 8
-      },
-      close: true,
-      fill: 'lightblue',
-      stroke: 'navy',
-      strokeWidth: 2
+      path: {
+        superformula: {
+          cx: 300,
+          cy: 100,
+          scale: 80,
+          m: 8,
+          n1: 0.5,
+          n2: 4,
+          n3: 8
+        },
+        close: true,
+        fill: 'lightblue',
+        stroke: 'navy',
+        strokeWidth: 2
+      }
     },
     // Rounded square (m=4)
     {
-      superformula: {
-        cx: 500,
-        cy: 100,
-        scale: 70,
-        m: 4,
-        n1: 2,
-        n2: 2,
-        n3: 2
-      },
-      close: true,
-      fill: 'lightgreen',
-      stroke: 'darkgreen',
-      strokeWidth: 2
+      path: {
+        superformula: {
+          cx: 500,
+          cy: 100,
+          scale: 70,
+          m: 4,
+          n1: 2,
+          n2: 2,
+          n3: 2
+        },
+        close: true,
+        fill: 'lightgreen',
+        stroke: 'darkgreen',
+        strokeWidth: 2
+      }
     }
   ]
 };
@@ -388,34 +402,38 @@ output('superformula', superformulaExample);
 const spirographExample: SvgDef = {
   size: [600, 300],
 
-  path: [
+  group: [
     // Epitrochoid - circle rolling outside (like a spirograph with outer gear)
     {
-      epitrochoid: {
-        cx: 150,
-        cy: 150,
-        R: 60,   // Fixed circle radius
-        r: 20,   // Rolling circle radius
-        d: 30    // Pen distance from rolling circle center
-      },
-      close: true,
-      fill: 'none',
-      stroke: 'crimson',
-      strokeWidth: 1.5
+      path: {
+        epitrochoid: {
+          cx: 150,
+          cy: 150,
+          R: 60,   // Fixed circle radius
+          r: 20,   // Rolling circle radius
+          d: 30    // Pen distance from rolling circle center
+        },
+        close: true,
+        fill: 'none',
+        stroke: 'crimson',
+        strokeWidth: 1.5
+      }
     },
     // Hypotrochoid - circle rolling inside (classic spirograph)
     {
-      hypotrochoid: {
-        cx: 450,
-        cy: 150,
-        R: 100,  // Fixed circle radius
-        r: 40,   // Rolling circle radius
-        d: 30    // Pen distance from rolling circle center
-      },
-      close: true,
-      fill: 'none',
-      stroke: 'navy',
-      strokeWidth: 1.5
+      path: {
+        hypotrochoid: {
+          cx: 450,
+          cy: 150,
+          R: 100,  // Fixed circle radius
+          r: 40,   // Rolling circle radius
+          d: 30    // Pen distance from rolling circle center
+        },
+        close: true,
+        fill: 'none',
+        stroke: 'navy',
+        strokeWidth: 1.5
+      }
     }
   ]
 };
@@ -448,7 +466,7 @@ const flowfieldExample: SvgDef = {
         stepSize: 3
       },
       fill: 'none',
-      stroke: ($: any) => `hsl(${$.i * 18}, 70%, 50%)`,
+      stroke: $ => `hsl(${$.i * 18}, 70%, 50%)`,
       strokeWidth: 1.5
     }
   }
@@ -480,7 +498,7 @@ const flowfieldNoise: SvgDef = {
         stepSize: 4
       },
       fill: 'none',
-      stroke: ($: any) => `hsla(${200 + $.i * 1.5}, 60%, 50%, 0.6)`,
+      stroke: $ => `hsla(${200 + $.i * 1.5}, 60%, 50%, 0.6)`,
       strokeWidth: 1
     }
   }
@@ -519,7 +537,7 @@ const flowfieldSink: SvgDef = {
         stepSize: 2
       },
       fill: 'none',
-      stroke: ($: any) => `hsl(${$.i * 10}, 70%, 50%)`,
+      stroke: $ => `hsl(${$.i * 10}, 70%, 50%)`,
       strokeWidth: 2
     }
   }
@@ -562,7 +580,7 @@ const flowfieldDipole: SvgDef = {
         stepSize: 2
       },
       fill: 'none',
-      stroke: ($: any) => `hsl(${180 + $.startY * 0.4}, 60%, 50%)`,
+      stroke: $ => `hsl(${180 + $.startY * 0.4}, 60%, 50%)`,
       strokeWidth: 1.5
     }
   }
@@ -596,7 +614,7 @@ const flowfieldTurbulent: SvgDef = {
         stepSize: 3
       },
       fill: 'none',
-      stroke: ($: any) => `hsla(${280 + $.i * 1.2}, 70%, 55%, 0.7)`,
+      stroke: $ => `hsla(${280 + $.i * 1.2}, 70%, 55%, 0.7)`,
       strokeWidth: 1.2
     }
   }
@@ -811,7 +829,7 @@ const voronoiExample: SvgDef = {
     // Draw each cell as a polygon using the vertices
     polygon: {
       points: $ => $.vertices,
-      fill: ($: any) => `hsl(${$.i * 18}, 70%, 85%)`,
+      fill: $ => `hsl(${$.i * 18}, 70%, 85%)`,
       stroke: 'white',
       strokeWidth: 2
     },
@@ -820,7 +838,7 @@ const voronoiExample: SvgDef = {
       cx: $ => $.x,
       cy: $ => $.y,
       r: 4,
-      fill: ($: any) => `hsl(${$.i * 18}, 70%, 40%)`,
+      fill: $ => `hsl(${$.i * 18}, 70%, 40%)`,
       stroke: 'none'
     }
   }
@@ -842,7 +860,7 @@ const delaunayExample: SvgDef = {
     // Draw each triangle
     polygon: {
       points: $ => $.vertices,
-      fill: ($: any) => `hsla(${$.i * 12}, 60%, 70%, 0.7)`,
+      fill: $ => `hsla(${$.i * 12}, 60%, 70%, 0.7)`,
       stroke: 'white',
       strokeWidth: 1
     }
@@ -862,7 +880,7 @@ const squareTiles: SvgDef = {
     rows: 8,
     polygon: {
       points: $ => $.vertices,
-      fill: ($: any) => ($.row + $.col) % 2 === 0 ? '#4a90d9' : '#f5f5f5',
+      fill: $ => ($.row + $.col) % 2 === 0 ? '#4a90d9' : '#f5f5f5',
       stroke: '#333',
       strokeWidth: 1
     }
@@ -881,7 +899,7 @@ const hexTiles: SvgDef = {
     rows: 8,
     polygon: {
       points: $ => $.vertices,
-      fill: ($: any) => `hsl(${($.row * 8 + $.col) * 5}, 60%, 70%)`,
+      fill: $ => `hsl(${($.row * 8 + $.col) * 5}, 60%, 70%)`,
       stroke: 'white',
       strokeWidth: 2
     }
@@ -900,7 +918,7 @@ const triangleTiles: SvgDef = {
     rows: 8,
     polygon: {
       points: $ => $.vertices,
-      fill: ($: any) => `hsl(${$.i * 3}, 50%, ${60 + ($.row % 2) * 20}%)`,
+      fill: $ => `hsl(${$.i * 3}, 50%, ${60 + ($.row % 2) * 20}%)`,
       stroke: 'white',
       strokeWidth: 1
     }
@@ -923,7 +941,7 @@ const packCircle: SvgDef = {
       cx: $ => $.x,
       cy: $ => $.y,
       r: $ => $.r,
-      fill: ($: any) => `hsl(${$.i * 3.6}, 70%, 60%)`,
+      fill: $ => `hsl(${$.i * 3.6}, 70%, 60%)`,
       stroke: 'white',
       strokeWidth: 1
     }
@@ -945,7 +963,7 @@ const packRect: SvgDef = {
       cx: $ => $.x,
       cy: $ => $.y,
       r: $ => $.r,
-      fill: ($: any) => `hsl(${200 + $.r * 3}, 60%, ${50 + $.r}%)`,
+      fill: $ => `hsl(${200 + $.r * 3}, 60%, ${50 + $.r}%)`,
       stroke: 'rgba(255,255,255,0.5)',
       strokeWidth: 2
     }
@@ -966,7 +984,7 @@ const randomPoints: SvgDef = {
       cx: $ => $.x,
       cy: $ => $.y,
       r: 4,
-      fill: ($: any) => `hsl(${$.i * 3.6}, 70%, 50%)`,
+      fill: $ => `hsl(${$.i * 3.6}, 70%, 50%)`,
       stroke: 'none'
     }
   }
@@ -986,7 +1004,7 @@ const poissonPoints: SvgDef = {
       cx: $ => $.x,
       cy: $ => $.y,
       r: 8,
-      fill: ($: any) => `hsl(${$.i * 5}, 60%, 55%)`,
+      fill: $ => `hsl(${$.i * 5}, 60%, 55%)`,
       stroke: 'white',
       strokeWidth: 1
     }
@@ -995,121 +1013,62 @@ const poissonPoints: SvgDef = {
 
 output('poisson-points', poissonPoints);
 
-// Composing random points with Voronoi - using a group to collect points
-// The random iterator generates points, which we collect and pass to voronoi
+// Composing random points with Voronoi using collect
 const randomVoronoi: SvgDef = {
   size: [400, 400],
 
-  // First, draw the voronoi cells using hardcoded random points
-  // (In a real scenario, you'd want a way to share generated points)
-  voronoi: {
-    points: (() => {
-      // Generate random points inline
-      const seed = 12345;
-      let s = seed;
-      const random = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
-      const pts: [number, number][] = [];
-      for (let i = 0; i < 30; i++) {
-        pts.push([20 + random() * 360, 20 + random() * 360]);
+  // Collect random points, then pass to voronoi
+  collect: {
+    points: {
+      random: {
+        count: 30,
+        bounds: { x: 20, y: 20, width: 360, height: 360 },
+        seed: 12345
       }
-      return pts;
-    })(),
-    bounds: { x: 0, y: 0, width: 400, height: 400 },
-    polygon: {
-      points: $ => $.vertices,
-      fill: ($: any) => `hsl(${$.i * 12}, 50%, 80%)`,
-      stroke: 'white',
-      strokeWidth: 2
     },
-    circle: {
-      cx: $ => $.x,
-      cy: $ => $.y,
-      r: 3,
-      fill: ($: any) => `hsl(${$.i * 12}, 70%, 40%)`,
-      stroke: 'none'
+    // Now $.points contains all the collected [x, y] pairs
+    voronoi: {
+      points: $ => $.points,
+      bounds: { x: 0, y: 0, width: 400, height: 400 },
+      polygon: {
+        points: $ => $.vertices,
+        fill: $ => `hsl(${$.i * 12}, 50%, 80%)`,
+        stroke: 'white',
+        strokeWidth: 2
+      },
+      circle: {
+        cx: $ => $.x,
+        cy: $ => $.y,
+        r: 3,
+        fill: $ => `hsl(${$.i * 12}, 70%, 40%)`,
+        stroke: 'none'
+      }
     }
   }
 };
 
 output('random-voronoi', randomVoronoi);
 
-// Poisson + Delaunay composition
+// Poisson + Delaunay composition using collect
 const poissonDelaunay: SvgDef = {
   size: [400, 400],
 
-  delaunay: {
-    points: (() => {
-      // Generate poisson disk sampled points inline
-      const radius = 30;
-      const seed = 42;
-      let s = seed;
-      const random = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
-
-      const boundsX = 20, boundsY = 20, boundsW = 360, boundsH = 360;
-      const cellSize = radius / Math.sqrt(2);
-      const gridW = Math.ceil(boundsW / cellSize);
-      const gridH = Math.ceil(boundsH / cellSize);
-      const grid: (number | null)[][] = Array(gridH).fill(null).map(() => Array(gridW).fill(null));
-      const points: { x: number; y: number }[] = [];
-      const active: number[] = [];
-
-      const gridIndex = (x: number, y: number): [number, number] =>
-        [Math.floor((x - boundsX) / cellSize), Math.floor((y - boundsY) / cellSize)];
-
-      const isValid = (x: number, y: number): boolean => {
-        if (x < boundsX || x >= boundsX + boundsW || y < boundsY || y >= boundsY + boundsH) return false;
-        const [gx, gy] = gridIndex(x, y);
-        for (let dy = -2; dy <= 2; dy++) {
-          for (let dx = -2; dx <= 2; dx++) {
-            const nx = gx + dx, ny = gy + dy;
-            if (nx >= 0 && nx < gridW && ny >= 0 && ny < gridH) {
-              const idx = grid[ny][nx];
-              if (idx !== null) {
-                const p = points[idx];
-                if (Math.sqrt((x - p.x) ** 2 + (y - p.y) ** 2) < radius) return false;
-              }
-            }
-          }
-        }
-        return true;
-      };
-
-      const x0 = boundsX + random() * boundsW;
-      const y0 = boundsY + random() * boundsH;
-      points.push({ x: x0, y: y0 });
-      active.push(0);
-      const [gx0, gy0] = gridIndex(x0, y0);
-      grid[gy0][gx0] = 0;
-
-      while (active.length > 0) {
-        const activeIdx = Math.floor(random() * active.length);
-        const point = points[active[activeIdx]];
-        let found = false;
-        for (let attempt = 0; attempt < 30; attempt++) {
-          const angle = random() * Math.PI * 2;
-          const dist = radius + random() * radius;
-          const x = point.x + Math.cos(angle) * dist;
-          const y = point.y + Math.sin(angle) * dist;
-          if (isValid(x, y)) {
-            const newIdx = points.length;
-            points.push({ x, y });
-            active.push(newIdx);
-            const [gx, gy] = gridIndex(x, y);
-            grid[gy][gx] = newIdx;
-            found = true;
-            break;
-          }
-        }
-        if (!found) active.splice(activeIdx, 1);
+  collect: {
+    points: {
+      poisson: {
+        radius: 30,
+        bounds: { x: 20, y: 20, width: 360, height: 360 },
+        seed: 42
       }
-
-      return points.map(p => [p.x, p.y] as [number, number]);
-    })(),
-    polygon: {
-      points: $ => $.vertices,
-      fill: ($: any) => `hsla(${200 + $.i * 3}, 60%, 70%, 0.8)`,
-      stroke: 'white',
-      strokeWidth: 1
+    },
+    delaunay: {
+      points: $ => $.points,
+      polygon: {
+        points: $ => $.vertices,
+        fill: $ => `hsla(${200 + $.i * 3}, 60%, 70%, 0.8)`,
+        stroke: 'white',
+        strokeWidth: 1
+      }
     }
   }
 };
