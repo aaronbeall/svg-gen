@@ -2,7 +2,7 @@ import type {
   SvgDef, LetBlock, PathData, CircleData, RectData, LineData, PolylineData, PolygonData, GroupData,
   ForIterator, GridIterator, SpiralIterator, LissajousIterator, RoseIterator, ParametricIterator,
   SuperformulaIterator, EpitrochoidIterator, HypotrochoidIterator, FlowfieldIterator, AttractorIterator,
-  FractalIterator, VoronoiIterator, DelaunayIterator, TileIterator, PackIterator,
+  FractalIterator, VoronoiIterator, DelaunayIterator, TileIterator, PackIterator, RandomIterator, PoissonIterator,
   ShapeOutput, ShapeIteratorProps, Scope
 } from './types.js';
 
@@ -1292,6 +1292,134 @@ function* iteratePack(data: PackIterator, parentScope: Record<string, ScopeValue
   }
 }
 
+/** Seeded random number generator */
+function seededRandom(seed: number): () => number {
+  return () => {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    return seed / 0x7fffffff;
+  };
+}
+
+/** Random points iterator - uniformly distributed random points */
+function* iterateRandom(data: RandomIterator, parentScope: Record<string, ScopeValue>): Generator<IteratorStep> {
+  const count = evalExpr(data.count, parentScope);
+  const boundsX = evalExpr(data.bounds.x, parentScope);
+  const boundsY = evalExpr(data.bounds.y, parentScope);
+  const boundsW = evalExpr(data.bounds.width, parentScope);
+  const boundsH = evalExpr(data.bounds.height, parentScope);
+  const seed = data.seed ? evalExpr(data.seed, parentScope) : Date.now();
+
+  const random = seededRandom(seed);
+
+  for (let i = 0; i < count; i++) {
+    const t = count > 1 ? i / (count - 1) : 0;
+    const x = boundsX + random() * boundsW;
+    const y = boundsY + random() * boundsH;
+
+    const stepScope = { x, y, t, i };
+    const innerScope = data.let ? createScope(data.let as AnyLetBlock, { ...parentScope, ...stepScope }) : stepScope;
+    yield { ...stepScope, ...innerScope };
+  }
+}
+
+/** Poisson disk sampling iterator - evenly-spaced random points */
+function* iteratePoisson(data: PoissonIterator, parentScope: Record<string, ScopeValue>): Generator<IteratorStep> {
+  const radius = evalExpr(data.radius, parentScope);
+  const boundsX = evalExpr(data.bounds.x, parentScope);
+  const boundsY = evalExpr(data.bounds.y, parentScope);
+  const boundsW = evalExpr(data.bounds.width, parentScope);
+  const boundsH = evalExpr(data.bounds.height, parentScope);
+  const seed = data.seed ? evalExpr(data.seed, parentScope) : Date.now();
+  const maxAttempts = data.maxAttempts ? evalExpr(data.maxAttempts, parentScope) : 30;
+
+  const random = seededRandom(seed);
+
+  // Grid cell size
+  const cellSize = radius / Math.sqrt(2);
+  const gridW = Math.ceil(boundsW / cellSize);
+  const gridH = Math.ceil(boundsH / cellSize);
+  const grid: (number | null)[][] = Array(gridH).fill(null).map(() => Array(gridW).fill(null));
+
+  const points: { x: number; y: number }[] = [];
+  const active: number[] = [];
+
+  // Helper to get grid cell
+  function gridIndex(x: number, y: number): [number, number] {
+    return [Math.floor((x - boundsX) / cellSize), Math.floor((y - boundsY) / cellSize)];
+  }
+
+  // Check if point is valid (not too close to others)
+  function isValid(x: number, y: number): boolean {
+    if (x < boundsX || x >= boundsX + boundsW || y < boundsY || y >= boundsY + boundsH) return false;
+
+    const [gx, gy] = gridIndex(x, y);
+    const searchRadius = 2;
+
+    for (let dy = -searchRadius; dy <= searchRadius; dy++) {
+      for (let dx = -searchRadius; dx <= searchRadius; dx++) {
+        const nx = gx + dx;
+        const ny = gy + dy;
+        if (nx >= 0 && nx < gridW && ny >= 0 && ny < gridH) {
+          const idx = grid[ny][nx];
+          if (idx !== null) {
+            const p = points[idx];
+            const dist = Math.sqrt((x - p.x) ** 2 + (y - p.y) ** 2);
+            if (dist < radius) return false;
+          }
+        }
+      }
+    }
+    return true;
+  }
+
+  // Add initial point
+  const x0 = boundsX + random() * boundsW;
+  const y0 = boundsY + random() * boundsH;
+  points.push({ x: x0, y: y0 });
+  active.push(0);
+  const [gx0, gy0] = gridIndex(x0, y0);
+  grid[gy0][gx0] = 0;
+
+  // Generate points
+  while (active.length > 0) {
+    const activeIdx = Math.floor(random() * active.length);
+    const pointIdx = active[activeIdx];
+    const point = points[pointIdx];
+
+    let found = false;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      const angle = random() * Math.PI * 2;
+      const dist = radius + random() * radius;
+      const x = point.x + Math.cos(angle) * dist;
+      const y = point.y + Math.sin(angle) * dist;
+
+      if (isValid(x, y)) {
+        const newIdx = points.length;
+        points.push({ x, y });
+        active.push(newIdx);
+        const [gx, gy] = gridIndex(x, y);
+        grid[gy][gx] = newIdx;
+        found = true;
+        break;
+      }
+    }
+
+    if (!found) {
+      active.splice(activeIdx, 1);
+    }
+  }
+
+  // Yield points
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    const t = points.length > 1 ? i / (points.length - 1) : 0;
+
+    const stepScope = { x: p.x, y: p.y, t, i };
+    const innerScope = data.let ? createScope(data.let as AnyLetBlock, { ...parentScope, ...stepScope }) : stepScope;
+    yield { ...stepScope, ...innerScope };
+  }
+}
+
 /** Get iterator from point-based shape data */
 function getPointIterator(data: PathData | PolylineData | PolygonData, scope: Record<string, ScopeValue>): Generator<IteratorStep> | null {
   if (data.for) return iterateFor(data.for, scope);
@@ -1341,6 +1469,8 @@ function getShapeIterators(data: ShapeIteratorProps, scope: Record<string, Scope
   if (data.delaunay) result.push({ iterator: iterateDelaunay(data.delaunay, scope), output: data.delaunay as AnyShapeOutput });
   if (data.tile) result.push({ iterator: iterateTile(data.tile, scope), output: data.tile as AnyShapeOutput });
   if (data.pack) result.push({ iterator: iteratePack(data.pack, scope), output: data.pack as AnyShapeOutput });
+  if (data.random) result.push({ iterator: iterateRandom(data.random, scope), output: data.random as AnyShapeOutput });
+  if (data.poisson) result.push({ iterator: iteratePoisson(data.poisson, scope), output: data.poisson as AnyShapeOutput });
   // Not yet implemented
   if (data.distribute) throw new Error('DistributeIterator not yet implemented');
   return result;

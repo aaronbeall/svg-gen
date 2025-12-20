@@ -544,12 +544,12 @@ const flowfieldDipole: SvgDef = {
           // Two poles - one positive (source), one negative (sink)
           const p1 = { x: 150, y: 200 }; // source
           const p2 = { x: 350, y: 200 }; // sink
-          
+
           const dx1 = $.x - p1.x, dy1 = $.y - p1.y;
           const dx2 = $.x - p2.x, dy2 = $.y - p2.y;
           const d1 = Math.sqrt(dx1 * dx1 + dy1 * dy1) || 1;
           const d2 = Math.sqrt(dx2 * dx2 + dy2 * dy2) || 1;
-          
+
           // Repel from p1, attract to p2
           const strength = 50;
           return [
@@ -953,3 +953,165 @@ const packRect: SvgDef = {
 };
 
 output('pack-rect', packRect);
+
+// Random points example
+const randomPoints: SvgDef = {
+  size: [400, 400],
+
+  random: {
+    count: 100,
+    bounds: { x: 20, y: 20, width: 360, height: 360 },
+    seed: 12345,
+    circle: {
+      cx: $ => $.x,
+      cy: $ => $.y,
+      r: 4,
+      fill: ($: any) => `hsl(${$.i * 3.6}, 70%, 50%)`,
+      stroke: 'none'
+    }
+  }
+};
+
+output('random-points', randomPoints);
+
+// Poisson disk sampling example
+const poissonPoints: SvgDef = {
+  size: [400, 400],
+
+  poisson: {
+    radius: 20,
+    bounds: { x: 20, y: 20, width: 360, height: 360 },
+    seed: 42,
+    circle: {
+      cx: $ => $.x,
+      cy: $ => $.y,
+      r: 8,
+      fill: ($: any) => `hsl(${$.i * 5}, 60%, 55%)`,
+      stroke: 'white',
+      strokeWidth: 1
+    }
+  }
+};
+
+output('poisson-points', poissonPoints);
+
+// Composing random points with Voronoi - using a group to collect points
+// The random iterator generates points, which we collect and pass to voronoi
+const randomVoronoi: SvgDef = {
+  size: [400, 400],
+
+  // First, draw the voronoi cells using hardcoded random points
+  // (In a real scenario, you'd want a way to share generated points)
+  voronoi: {
+    points: (() => {
+      // Generate random points inline
+      const seed = 12345;
+      let s = seed;
+      const random = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+      const pts: [number, number][] = [];
+      for (let i = 0; i < 30; i++) {
+        pts.push([20 + random() * 360, 20 + random() * 360]);
+      }
+      return pts;
+    })(),
+    bounds: { x: 0, y: 0, width: 400, height: 400 },
+    polygon: {
+      points: $ => $.vertices,
+      fill: ($: any) => `hsl(${$.i * 12}, 50%, 80%)`,
+      stroke: 'white',
+      strokeWidth: 2
+    },
+    circle: {
+      cx: $ => $.x,
+      cy: $ => $.y,
+      r: 3,
+      fill: ($: any) => `hsl(${$.i * 12}, 70%, 40%)`,
+      stroke: 'none'
+    }
+  }
+};
+
+output('random-voronoi', randomVoronoi);
+
+// Poisson + Delaunay composition
+const poissonDelaunay: SvgDef = {
+  size: [400, 400],
+
+  delaunay: {
+    points: (() => {
+      // Generate poisson disk sampled points inline
+      const radius = 30;
+      const seed = 42;
+      let s = seed;
+      const random = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+
+      const boundsX = 20, boundsY = 20, boundsW = 360, boundsH = 360;
+      const cellSize = radius / Math.sqrt(2);
+      const gridW = Math.ceil(boundsW / cellSize);
+      const gridH = Math.ceil(boundsH / cellSize);
+      const grid: (number | null)[][] = Array(gridH).fill(null).map(() => Array(gridW).fill(null));
+      const points: { x: number; y: number }[] = [];
+      const active: number[] = [];
+
+      const gridIndex = (x: number, y: number): [number, number] =>
+        [Math.floor((x - boundsX) / cellSize), Math.floor((y - boundsY) / cellSize)];
+
+      const isValid = (x: number, y: number): boolean => {
+        if (x < boundsX || x >= boundsX + boundsW || y < boundsY || y >= boundsY + boundsH) return false;
+        const [gx, gy] = gridIndex(x, y);
+        for (let dy = -2; dy <= 2; dy++) {
+          for (let dx = -2; dx <= 2; dx++) {
+            const nx = gx + dx, ny = gy + dy;
+            if (nx >= 0 && nx < gridW && ny >= 0 && ny < gridH) {
+              const idx = grid[ny][nx];
+              if (idx !== null) {
+                const p = points[idx];
+                if (Math.sqrt((x - p.x) ** 2 + (y - p.y) ** 2) < radius) return false;
+              }
+            }
+          }
+        }
+        return true;
+      };
+
+      const x0 = boundsX + random() * boundsW;
+      const y0 = boundsY + random() * boundsH;
+      points.push({ x: x0, y: y0 });
+      active.push(0);
+      const [gx0, gy0] = gridIndex(x0, y0);
+      grid[gy0][gx0] = 0;
+
+      while (active.length > 0) {
+        const activeIdx = Math.floor(random() * active.length);
+        const point = points[active[activeIdx]];
+        let found = false;
+        for (let attempt = 0; attempt < 30; attempt++) {
+          const angle = random() * Math.PI * 2;
+          const dist = radius + random() * radius;
+          const x = point.x + Math.cos(angle) * dist;
+          const y = point.y + Math.sin(angle) * dist;
+          if (isValid(x, y)) {
+            const newIdx = points.length;
+            points.push({ x, y });
+            active.push(newIdx);
+            const [gx, gy] = gridIndex(x, y);
+            grid[gy][gx] = newIdx;
+            found = true;
+            break;
+          }
+        }
+        if (!found) active.splice(activeIdx, 1);
+      }
+
+      return points.map(p => [p.x, p.y] as [number, number]);
+    })(),
+    polygon: {
+      points: $ => $.vertices,
+      fill: ($: any) => `hsla(${200 + $.i * 3}, 60%, 70%, 0.8)`,
+      stroke: 'white',
+      strokeWidth: 1
+    }
+  }
+};
+
+output('poisson-delaunay', poissonDelaunay);

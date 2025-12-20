@@ -193,6 +193,12 @@ export type PackIteratorScope = Scope & { x: number; y: number; r: number; i: nu
 /** Distribute iterator provides x, y, t, i */
 export type DistributeIteratorScope = Scope & { x: number; y: number; t: number; i: number };
 
+/** Random iterator provides x, y, t, i */
+export type RandomIteratorScope = Scope & { x: number; y: number; t: number; i: number };
+
+/** Poisson iterator provides x, y, t, i */
+export type PoissonIteratorScope = Scope & { x: number; y: number; t: number; i: number };
+
 /** Grid iterator provides x, y, row, col, i, t */
 export type GridIteratorScope = Scope & { x: number; y: number; row: number; col: number; i: number; t: number };
 
@@ -408,6 +414,28 @@ export interface DistributeIterator extends ScopeProps<DistributeIteratorScope> 
     | { circle: { cx: Expr<number>; cy: Expr<number>; r: Expr<number> } };
 }
 
+/** Random iterator - uniformly random points within bounds */
+export interface RandomIterator extends ScopeProps<RandomIteratorScope> {
+  /** Number of points */
+  count: Expr<number>;
+  /** Bounding area */
+  bounds: { x: Expr<number>; y: Expr<number>; width: Expr<number>; height: Expr<number> };
+  /** Random seed for reproducibility */
+  seed?: Expr<number>;
+}
+
+/** Poisson disk sampling iterator - evenly-spaced random points */
+export interface PoissonIterator extends ScopeProps<PoissonIteratorScope> {
+  /** Minimum distance between points */
+  radius: Expr<number>;
+  /** Bounding area */
+  bounds: { x: Expr<number>; y: Expr<number>; width: Expr<number>; height: Expr<number> };
+  /** Random seed for reproducibility */
+  seed?: Expr<number>;
+  /** Max attempts per point (default 30) */
+  maxAttempts?: Expr<number>;
+}
+
 // ============================================================================
 // Iterator Output Types (what iterators produce)
 // ============================================================================
@@ -573,7 +601,9 @@ export type Iterator =
   | DelaunayIterator
   | TileIterator
   | PackIterator
-  | DistributeIterator;
+  | DistributeIterator
+  | RandomIterator
+  | PoissonIterator;
 
 // ============================================================================
 // Iterator Properties (shared by SvgDef and GroupData)
@@ -613,6 +643,10 @@ export interface ShapeIteratorProps {
   pack?: PackIterator & ShapeOutput<PackIteratorScope>;
   /** Distribute iterator */
   distribute?: DistributeIterator & ShapeOutput<DistributeIteratorScope>;
+  /** Random iterator */
+  random?: RandomIterator & ShapeOutput<RandomIteratorScope>;
+  /** Poisson disk sampling iterator */
+  poisson?: PoissonIterator & ShapeOutput<PoissonIteratorScope>;
   /** Grid iterator */
   grid?: GridIterator & ShapeOutput<GridIteratorScope>;
 }
