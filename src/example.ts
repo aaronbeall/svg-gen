@@ -1074,3 +1074,219 @@ const poissonDelaunay: SvgDef = {
 };
 
 output('poisson-delaunay', poissonDelaunay);
+
+// ============================================================================
+// Noise Examples
+// ============================================================================
+
+// Noise iterator - visualize noise values as circles
+const noiseVisualization: SvgDef = {
+  size: [400, 400],
+
+  noise: {
+    cols: 20,
+    rows: 20,
+    scale: 3,
+    seed: 42,
+    bounds: { x: 20, y: 20, width: 360, height: 360 },
+    circle: {
+      cx: $ => $.x,
+      cy: $ => $.y,
+      r: $ => 3 + ($.value + 1) * 5, // value is -1 to 1, map to 3-13
+      fill: $ => `hsl(${180 + $.value * 60}, 70%, 50%)`,
+      stroke: 'none'
+    }
+  }
+};
+
+output('noise-visualization', noiseVisualization);
+
+// Noise modifier on path - wobbly circle
+const noiseModifierPath: SvgDef = {
+  size: [400, 400],
+
+  path: {
+    for: {
+      i: 0,
+      to: 64,
+      let: {
+        angle: $ => $.i * Math.PI * 2 / 64
+      },
+      point: [
+        $ => 200 + Math.cos($.angle) * 100,
+        $ => 200 + Math.sin($.angle) * 100
+      ]
+    },
+    close: true,
+    // Apply noise displacement to the points
+    noise: {
+      scale: 0.02,
+      amplitude: 20,
+      seed: 123
+    },
+    fill: 'lightblue',
+    stroke: 'navy',
+    strokeWidth: 2
+  }
+};
+
+output('noise-modifier-path', noiseModifierPath);
+
+// Jitter modifier on polygon - rough hexagon
+const jitterModifierPolygon: SvgDef = {
+  size: [400, 400],
+
+  polygon: {
+    for: {
+      i: 0,
+      to: 6,
+      let: {
+        angle: $ => $.i * Math.PI * 2 / 6 - Math.PI / 2
+      },
+      point: [
+        $ => 200 + Math.cos($.angle) * 120,
+        $ => 200 + Math.sin($.angle) * 120
+      ]
+    },
+    // Apply random jitter to points
+    jitter: {
+      x: 15,
+      y: 15,
+      seed: 456
+    },
+    fill: 'coral',
+    stroke: 'darkred',
+    strokeWidth: 2
+  }
+};
+
+output('jitter-modifier-polygon', jitterModifierPolygon);
+
+// Subdivide modifier - smooth a triangle into a curve
+const subdivideModifier: SvgDef = {
+  size: [400, 400],
+
+  path: {
+    points: [[100, 300], [200, 100], [300, 300]],
+    close: true,
+    // Subdivide with Chaikin's algorithm
+    subdivide: {
+      iterations: 4,
+      algorithm: 'chaikin'
+    },
+    fill: 'lightgreen',
+    stroke: 'darkgreen',
+    strokeWidth: 2
+  }
+};
+
+output('subdivide-modifier', subdivideModifier);
+
+// Combined modifiers - subdivide then add noise
+const combinedModifiers: SvgDef = {
+  size: [400, 400],
+
+  path: {
+    points: [[100, 300], [200, 100], [300, 300]],
+    close: true,
+    // First subdivide to add more points
+    subdivide: {
+      iterations: 3,
+      algorithm: 'chaikin'
+    },
+    // Then add noise displacement
+    noise: {
+      scale: 0.05,
+      amplitude: 10,
+      seed: 789
+    },
+    fill: 'lavender',
+    stroke: 'purple',
+    strokeWidth: 2
+  }
+};
+
+output('combined-modifiers', combinedModifiers);
+
+// Noise iterator driving circle sizes - terrain-like visualization
+const noiseTerrainCircles: SvgDef = {
+  size: [400, 400],
+
+  noise: {
+    cols: 15,
+    rows: 15,
+    scale: 2,
+    octaves: 3,
+    persistence: 0.5,
+    seed: 999,
+    bounds: { x: 30, y: 30, width: 340, height: 340 },
+    circle: {
+      cx: $ => $.x,
+      cy: $ => $.y,
+      r: $ => Math.max(2, ($.value + 1) * 8),
+      fill: $ => {
+        const v = ($.value + 1) / 2; // 0-1
+        if (v < 0.3) return '#2d5a27'; // deep green (valley)
+        if (v < 0.5) return '#4a7c42'; // green
+        if (v < 0.7) return '#8b7355'; // brown (hills)
+        return '#a0a0a0'; // gray (peaks)
+      },
+      stroke: 'none'
+    }
+  }
+};
+
+output('noise-terrain', noiseTerrainCircles);
+
+// Mirror modifier - create symmetric shape from half
+const mirrorModifier: SvgDef = {
+  size: [400, 400],
+
+  path: {
+    // Draw half a leaf shape
+    points: [
+      [200, 50],   // top
+      [220, 100],
+      [250, 150],
+      [240, 200],
+      [200, 250],  // bottom center
+    ],
+    // Mirror across X axis to complete the leaf
+    mirror: {
+      axis: 'x',
+      at: 200  // mirror at x=200
+    },
+    close: true,
+    fill: 'lightgreen',
+    stroke: 'darkgreen',
+    strokeWidth: 2
+  }
+};
+
+output('mirror-modifier', mirrorModifier);
+
+// Mirror both axes - create 4-way symmetry
+const mirrorBoth: SvgDef = {
+  size: [400, 400],
+
+  polygon: {
+    // Draw one quadrant of a shape
+    points: [
+      [200, 200],
+      [220, 180],
+      [260, 170],
+      [280, 150],
+      [300, 200],
+    ],
+    // Mirror both axes for 4-way symmetry
+    mirror: {
+      axis: 'both',
+      at: 200
+    },
+    fill: 'lavender',
+    stroke: 'purple',
+    strokeWidth: 2
+  }
+};
+
+output('mirror-both', mirrorBoth);

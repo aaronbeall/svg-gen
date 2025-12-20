@@ -16,108 +16,75 @@ export type LetBlock<S extends Scope = Scope> = {
 };
 
 // ============================================================================
-// Modifiers (transform points)
+// Modifiers (transform points or values)
 // ============================================================================
 
-/** Noise displacement modifier */
-export interface NoiseModifier {
-  noise: {
-    /** Noise scale (frequency) */
-    scale?: Expr<number>;
-    /** Displacement amplitude */
-    amplitude: Expr<number>;
-    /** Random seed for reproducibility */
-    seed?: Expr<number>;
-    /** Noise type */
-    type?: Expr<'perlin' | 'simplex' | 'value'>;
-  };
+/** Noise configuration */
+export interface NoiseConfig<S extends Scope = Scope> {
+  /** Noise scale/frequency (default: 1) */
+  scale?: Expr<number, S>;
+  /** Displacement amplitude */
+  amplitude?: Expr<number, S>;
+  /** Random seed for reproducibility */
+  seed?: Expr<number, S>;
+  /** Noise type (default: 'simplex') */
+  type?: Expr<'perlin' | 'simplex' | 'value', S>;
+  /** Octaves for fractal noise (default: 1) */
+  octaves?: Expr<number, S>;
+  /** Lacunarity for fractal noise (default: 2) */
+  lacunarity?: Expr<number, S>;
+  /** Persistence for fractal noise (default: 0.5) */
+  persistence?: Expr<number, S>;
 }
 
-/** Random jitter modifier */
-export interface JitterModifier {
-  jitter: {
-    /** Max X offset */
-    dx: Expr<number>;
-    /** Max Y offset */
-    dy: Expr<number>;
-    /** Random seed */
-    seed?: Expr<number>;
-  };
+/** Jitter configuration */
+export interface JitterConfig<S extends Scope = Scope> {
+  /** Max X offset */
+  x?: Expr<number, S>;
+  /** Max Y offset */
+  y?: Expr<number, S>;
+  /** Random seed */
+  seed?: Expr<number, S>;
 }
 
-/** Subdivision smoothing modifier */
-export interface SubdivideModifier {
-  subdivide: {
-    /** Number of subdivision iterations */
-    iterations: Expr<number>;
-    /** Algorithm: 'chaikin' | 'midpoint' */
-    algorithm?: Expr<'chaikin' | 'midpoint'>;
-  };
+/** Subdivision configuration */
+export interface SubdivideConfig<S extends Scope = Scope> {
+  /** Number of subdivision iterations */
+  iterations?: Expr<number, S>;
+  /** Algorithm (default: 'chaikin') */
+  algorithm?: Expr<'chaikin' | 'midpoint', S>;
 }
 
-/** Morph between current and target shape */
-export interface MorphModifier {
-  morph: {
-    /** Target shape points */
-    to: ForIterator;
-    /** Interpolation factor 0-1 */
-    t: Expr<number>;
-  };
+/** Smooth configuration */
+export interface SmoothConfig<S extends Scope = Scope> {
+  /** Smoothing strength 0-1 (default: 0.5) */
+  strength?: Expr<number, S>;
+  /** Number of iterations (default: 1) */
+  iterations?: Expr<number, S>;
 }
 
-/** Repeat modifier (radial or linear) */
-export interface RepeatModifier {
-  repeat: {
-    /** Number of repetitions */
-    count: Expr<number>;
-    /** Radial repeat around center */
-    radial?: {
-      cx: Expr<number>;
-      cy: Expr<number>;
-    };
-    /** Linear repeat with offset */
-    linear?: {
-      dx: Expr<number>;
-      dy: Expr<number>;
-    };
-  };
+/** Mirror configuration */
+export interface MirrorConfig<S extends Scope = Scope> {
+  /** Mirror axis: 'x' | 'y' | 'both' */
+  axis: Expr<'x' | 'y' | 'both', S>;
+  /** Axis position (default: center of points) */
+  at?: Expr<number, S>;
+  /** Include original points (default: true) */
+  includeOriginal?: Expr<boolean, S>;
 }
 
-/** Mirror modifier */
-export interface MirrorModifier {
-  mirror: {
-    /** Mirror axis: 'x' | 'y' | 'both' */
-    axis: Expr<'x' | 'y' | 'both'>;
-    /** Axis position */
-    at?: Expr<number>;
-    /** Include original */
-    includeOriginal?: boolean;
-  };
-}
-
-/** Union of all modifier types */
-export type Modifier =
-  | NoiseModifier
-  | JitterModifier
-  | SubdivideModifier
-  | MorphModifier
-  | RepeatModifier
-  | MirrorModifier;
-
-/** Inline modifier properties that can be added to any generator */
-export interface InlineModifiers {
-  /** Noise displacement */
-  noise?: OneOrMany<NoiseModifier['noise']>;
-  /** Random jitter */
-  jitter?: OneOrMany<JitterModifier['jitter']>;
-  /** Subdivision smoothing */
-  subdivide?: OneOrMany<SubdivideModifier['subdivide']>;
-  /** Repeat (radial or linear) */
-  repeat?: OneOrMany<RepeatModifier['repeat']>;
-  /** Mirror across axis */
-  mirror?: OneOrMany<MirrorModifier['mirror']>;
-  /** Explicit modifier stack (applied in order after inline modifiers) */
-  modifiers?: OneOrMany<Modifier>;
+/** Point modifiers that transform point arrays */
+export interface PointModifiers<S extends Scope = Scope> {
+  /** Apply noise displacement to points */
+  noise?: NoiseConfig<S>;
+  /** Apply random jitter to points */
+  jitter?: JitterConfig<S>;
+  /** Subdivide path segments */
+  subdivide?: SubdivideConfig<S>;
+  /** Smooth the path */
+  smooth?: SmoothConfig<S>;
+  /** Mirror points across axis */
+  mirror?: MirrorConfig<S>;
 }
 
 // ============================================================================
@@ -198,6 +165,9 @@ export type RandomIteratorScope = Scope & { x: number; y: number; t: number; i: 
 
 /** Poisson iterator provides x, y, t, i */
 export type PoissonIteratorScope = Scope & { x: number; y: number; t: number; i: number };
+
+/** Noise iterator provides x, y, value, i - samples noise at grid positions */
+export type NoiseIteratorScope = Scope & { x: number; y: number; value: number; i: number };
 
 /** Grid iterator provides x, y, row, col, i, t */
 export type GridIteratorScope = Scope & { x: number; y: number; row: number; col: number; i: number; t: number };
@@ -442,6 +412,16 @@ export interface PoissonIterator extends ScopeProps<PoissonIteratorScope> {
   maxAttempts?: Expr<number>;
 }
 
+/** Noise iterator - samples noise values at grid positions */
+export interface NoiseIterator extends ScopeProps<NoiseIteratorScope>, NoiseConfig {
+  /** Number of columns */
+  cols: Expr<number>;
+  /** Number of rows */
+  rows: Expr<number>;
+  /** Sampling area */
+  bounds?: { x: Expr<number>; y: Expr<number>; width: Expr<number>; height: Expr<number> };
+}
+
 // ============================================================================
 // Collect - accumulates iterator points into an array for batch consumers
 // ============================================================================
@@ -522,16 +502,16 @@ export interface DirectPoints<S extends Scope = Scope> {
 }
 
 /** Path from points */
-export interface PathData<S extends Scope = Scope> extends PointIteratorProps, DirectPoints<S>, StyleProps<S>, InlineModifiers {
+export interface PathData<S extends Scope = Scope> extends PointIteratorProps, DirectPoints<S>, StyleProps<S>, PointModifiers<S> {
   /** Close the path */
   close?: boolean;
 }
 
 /** Polyline from points */
-export interface PolylineData<S extends Scope = Scope> extends PointIteratorProps, DirectPoints<S>, StyleProps<S>, InlineModifiers {}
+export interface PolylineData<S extends Scope = Scope> extends PointIteratorProps, DirectPoints<S>, StyleProps<S>, PointModifiers<S> {}
 
 /** Polygon from points */
-export interface PolygonData<S extends Scope = Scope> extends PointIteratorProps, DirectPoints<S>, StyleProps<S>, InlineModifiers {}
+export interface PolygonData<S extends Scope = Scope> extends PointIteratorProps, DirectPoints<S>, StyleProps<S>, PointModifiers<S> {}
 
 // ============================================================================
 // Fixed Shapes (no iterators - use container iterators to produce multiples)
@@ -565,7 +545,7 @@ export interface LineData<S extends Scope = Scope> extends Omit<StyleProps<S>, '
 // ============================================================================
 
 /** Bezier curve with control points */
-export interface BezierData extends StyleProps, InlineModifiers {
+export interface BezierData extends StyleProps, PointModifiers {
   /** Start point */
   start: [Expr<number>, Expr<number>];
   /** Control point 1 */
@@ -580,7 +560,7 @@ export interface BezierData extends StyleProps, InlineModifiers {
 }
 
 /** Spline through points with tension control */
-export interface SplineData extends StyleProps, InlineModifiers {
+export interface SplineData extends StyleProps, PointModifiers {
   /** Points to interpolate through */
   points: [Expr<number>, Expr<number>][] | ForIterator;
   /** Tension: 0 = Catmull-Rom, 1 = linear */
@@ -627,7 +607,8 @@ export type Iterator =
   | PackIterator
   | DistributeIterator
   | RandomIterator
-  | PoissonIterator;
+  | PoissonIterator
+  | NoiseIterator;
 
 // ============================================================================
 // Iterator Properties (shared by SvgDef and GroupData)
@@ -671,6 +652,8 @@ export interface ShapeIteratorProps {
   random?: RandomIterator & ShapeOutput<RandomIteratorScope>;
   /** Poisson disk sampling iterator */
   poisson?: PoissonIterator & ShapeOutput<PoissonIteratorScope>;
+  /** Noise iterator - samples noise values at grid positions */
+  noise?: NoiseIterator & ShapeOutput<NoiseIteratorScope>;
   /** Grid iterator */
   grid?: GridIterator & ShapeOutput<GridIteratorScope>;
 }

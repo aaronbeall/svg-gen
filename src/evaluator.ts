@@ -3,6 +3,7 @@ import type {
   ForIterator, GridIterator, SpiralIterator, LissajousIterator, RoseIterator, ParametricIterator,
   SuperformulaIterator, EpitrochoidIterator, HypotrochoidIterator, FlowfieldIterator, AttractorIterator,
   FractalIterator, VoronoiIterator, DelaunayIterator, TileIterator, PackIterator, RandomIterator, PoissonIterator,
+  NoiseIterator, NoiseConfig, PointModifiers,
   ShapeOutput, ShapeIteratorProps, Scope, Collect
 } from './types.js';
 
@@ -208,7 +209,11 @@ function evalPoints(data: PathData | PolylineData | PolygonData, scope: Record<s
 
 /** Evaluate a path - collects points from iterator */
 function evalPath(data: PathData, scope: Record<string, ScopeValue>): EvalPath {
-  const points = evalPoints(data, scope);
+  let points = evalPoints(data, scope);
+  // Apply point modifiers if present
+  if (hasPointModifiers(data)) {
+    points = applyPointModifiers(points, data, scope);
+  }
   const close = data.close ?? false;
   const d = pointsToPathD(points, close);
   return {
@@ -258,18 +263,28 @@ function evalLine(data: LineData, scope: Record<string, ScopeValue>): EvalLine {
 
 /** Evaluate polyline - collects points from iterator */
 function evalPolyline(data: PolylineData, scope: Record<string, ScopeValue>): EvalPolyline {
+  let points = evalPoints(data, scope);
+  // Apply point modifiers if present
+  if (hasPointModifiers(data)) {
+    points = applyPointModifiers(points, data, scope);
+  }
   return {
     type: 'polyline',
-    points: evalPoints(data, scope),
+    points,
     ...evalStyles(data, scope)
   };
 }
 
 /** Evaluate polygon - collects points from iterator */
 function evalPolygon(data: PolygonData, scope: Record<string, ScopeValue>): EvalPolygon {
+  let points = evalPoints(data, scope);
+  // Apply point modifiers if present
+  if (hasPointModifiers(data)) {
+    points = applyPointModifiers(points, data, scope);
+  }
   return {
     type: 'polygon',
-    points: evalPoints(data, scope),
+    points,
     ...evalStyles(data, scope)
   };
 }
@@ -1431,6 +1446,300 @@ function* iteratePoisson(data: PoissonIterator, parentScope: Record<string, Scop
   }
 }
 
+// ============================================================================
+// Noise Functions
+// ============================================================================
+
+/** Simplex noise implementation (2D) */
+function createNoise2D(seed: number = 0) {
+  const random = seededRandom(seed);
+
+  // Permutation table
+  const perm = new Uint8Array(512);
+  const permMod12 = new Uint8Array(512);
+  const p = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) p[i] = i;
+  for (let i = 255; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [p[i], p[j]] = [p[j], p[i]];
+  }
+  for (let i = 0; i < 512; i++) {
+    perm[i] = p[i & 255];
+    permMod12[i] = perm[i] % 12;
+  }
+
+  // Gradients for 2D
+  const grad3 = [
+    [1, 1, 0], [-1, 1, 0], [1, -1, 0], [-1, -1, 0],
+    [1, 0, 1], [-1, 0, 1], [1, 0, -1], [-1, 0, -1],
+    [0, 1, 1], [0, -1, 1], [0, 1, -1], [0, -1, -1]
+  ];
+
+  const F2 = 0.5 * (Math.sqrt(3) - 1);
+  const G2 = (3 - Math.sqrt(3)) / 6;
+
+  return function noise2D(x: number, y: number): number {
+    // Skew input space
+    const s = (x + y) * F2;
+    const i = Math.floor(x + s);
+    const j = Math.floor(y + s);
+
+    // Unskew back
+    const t = (i + j) * G2;
+    const X0 = i - t;
+    const Y0 = j - t;
+    const x0 = x - X0;
+    const y0 = y - Y0;
+
+    // Determine simplex
+    const i1 = x0 > y0 ? 1 : 0;
+    const j1 = x0 > y0 ? 0 : 1;
+
+    const x1 = x0 - i1 + G2;
+    const y1 = y0 - j1 + G2;
+    const x2 = x0 - 1 + 2 * G2;
+    const y2 = y0 - 1 + 2 * G2;
+
+    // Hash coordinates
+    const ii = i & 255;
+    const jj = j & 255;
+    const gi0 = permMod12[ii + perm[jj]];
+    const gi1 = permMod12[ii + i1 + perm[jj + j1]];
+    const gi2 = permMod12[ii + 1 + perm[jj + 1]];
+
+    // Calculate contributions
+    let n0 = 0, n1 = 0, n2 = 0;
+
+    let t0 = 0.5 - x0 * x0 - y0 * y0;
+    if (t0 >= 0) {
+      t0 *= t0;
+      n0 = t0 * t0 * (grad3[gi0][0] * x0 + grad3[gi0][1] * y0);
+    }
+
+    let t1 = 0.5 - x1 * x1 - y1 * y1;
+    if (t1 >= 0) {
+      t1 *= t1;
+      n1 = t1 * t1 * (grad3[gi1][0] * x1 + grad3[gi1][1] * y1);
+    }
+
+    let t2 = 0.5 - x2 * x2 - y2 * y2;
+    if (t2 >= 0) {
+      t2 *= t2;
+      n2 = t2 * t2 * (grad3[gi2][0] * x2 + grad3[gi2][1] * y2);
+    }
+
+    // Scale to [-1, 1]
+    return 70 * (n0 + n1 + n2);
+  };
+}
+
+/** Get noise value with fractal/octave support */
+function getNoise(
+  noise2D: (x: number, y: number) => number,
+  x: number,
+  y: number,
+  octaves: number = 1,
+  lacunarity: number = 2,
+  persistence: number = 0.5
+): number {
+  let value = 0;
+  let amplitude = 1;
+  let frequency = 1;
+  let maxValue = 0;
+
+  for (let i = 0; i < octaves; i++) {
+    value += noise2D(x * frequency, y * frequency) * amplitude;
+    maxValue += amplitude;
+    amplitude *= persistence;
+    frequency *= lacunarity;
+  }
+
+  return value / maxValue;
+}
+
+/** Noise iterator - samples noise values at grid positions */
+function* iterateNoise(data: NoiseIterator, parentScope: Record<string, ScopeValue>): Generator<IteratorStep> {
+  const cols = evalExpr(data.cols, parentScope);
+  const rows = evalExpr(data.rows, parentScope);
+  const scale = data.scale ? evalExpr(data.scale, parentScope) : 1;
+  const seed = data.seed ? evalExpr(data.seed, parentScope) : 0;
+  const octaves = data.octaves ? evalExpr(data.octaves, parentScope) : 1;
+  const lacunarity = data.lacunarity ? evalExpr(data.lacunarity, parentScope) : 2;
+  const persistence = data.persistence ? evalExpr(data.persistence, parentScope) : 0.5;
+
+  const boundsX = data.bounds ? evalExpr(data.bounds.x, parentScope) : 0;
+  const boundsY = data.bounds ? evalExpr(data.bounds.y, parentScope) : 0;
+  const boundsW = data.bounds ? evalExpr(data.bounds.width, parentScope) : cols;
+  const boundsH = data.bounds ? evalExpr(data.bounds.height, parentScope) : rows;
+
+  const noise2D = createNoise2D(seed);
+  const cellW = boundsW / cols;
+  const cellH = boundsH / rows;
+
+  const total = rows * cols;
+  let i = 0;
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const x = boundsX + (col + 0.5) * cellW;
+      const y = boundsY + (row + 0.5) * cellH;
+      const noiseX = col * scale / cols;
+      const noiseY = row * scale / rows;
+      const value = getNoise(noise2D, noiseX, noiseY, octaves, lacunarity, persistence);
+      const t = total > 1 ? i / (total - 1) : 0;
+
+      const stepScope = { x, y, value, t, i, row, col };
+      const innerScope = data.let ? createScope(data.let as AnyLetBlock, { ...parentScope, ...stepScope }) : stepScope;
+      yield { ...stepScope, ...innerScope };
+      i++;
+    }
+  }
+}
+
+// ============================================================================
+// Point Modifiers
+// ============================================================================
+
+/** Apply point modifiers to a point array */
+function applyPointModifiers(
+  points: EvalPoint[],
+  modifiers: PointModifiers,
+  scope: Record<string, ScopeValue>
+): EvalPoint[] {
+  let result = [...points];
+
+  // Apply noise displacement
+  if (modifiers.noise) {
+    const scale = modifiers.noise.scale ? evalExpr(modifiers.noise.scale, scope) : 1;
+    const amplitude = modifiers.noise.amplitude ? evalExpr(modifiers.noise.amplitude, scope) : 10;
+    const seed = modifiers.noise.seed ? evalExpr(modifiers.noise.seed, scope) : 0;
+    const octaves = modifiers.noise.octaves ? evalExpr(modifiers.noise.octaves, scope) : 1;
+    const lacunarity = modifiers.noise.lacunarity ? evalExpr(modifiers.noise.lacunarity, scope) : 2;
+    const persistence = modifiers.noise.persistence ? evalExpr(modifiers.noise.persistence, scope) : 0.5;
+
+    const noise2D = createNoise2D(seed);
+    result = result.map((p, i) => {
+      const nx = getNoise(noise2D, p.x * scale, p.y * scale, octaves, lacunarity, persistence);
+      const ny = getNoise(noise2D, p.x * scale + 1000, p.y * scale + 1000, octaves, lacunarity, persistence);
+      return { x: p.x + nx * amplitude, y: p.y + ny * amplitude };
+    });
+  }
+
+  // Apply jitter
+  if (modifiers.jitter) {
+    const jitterX = modifiers.jitter.x ? evalExpr(modifiers.jitter.x, scope) : 0;
+    const jitterY = modifiers.jitter.y ? evalExpr(modifiers.jitter.y, scope) : 0;
+    const seed = modifiers.jitter.seed ? evalExpr(modifiers.jitter.seed, scope) : Date.now();
+    const random = seededRandom(seed);
+    result = result.map(p => ({
+      x: p.x + (random() - 0.5) * 2 * jitterX,
+      y: p.y + (random() - 0.5) * 2 * jitterY
+    }));
+  }
+
+  // Apply subdivision
+  if (modifiers.subdivide) {
+    const iterations = modifiers.subdivide.iterations ? evalExpr(modifiers.subdivide.iterations, scope) : 1;
+    const algorithm = modifiers.subdivide.algorithm ? evalExpr(modifiers.subdivide.algorithm, scope) : 'chaikin';
+
+    for (let iter = 0; iter < iterations; iter++) {
+      if (algorithm === 'chaikin') {
+        // Chaikin's corner cutting algorithm
+        const newPoints: EvalPoint[] = [];
+        for (let i = 0; i < result.length - 1; i++) {
+          const p0 = result[i];
+          const p1 = result[i + 1];
+          newPoints.push({ x: p0.x * 0.75 + p1.x * 0.25, y: p0.y * 0.75 + p1.y * 0.25 });
+          newPoints.push({ x: p0.x * 0.25 + p1.x * 0.75, y: p0.y * 0.25 + p1.y * 0.75 });
+        }
+        result = newPoints;
+      } else {
+        // Midpoint subdivision
+        const newPoints: EvalPoint[] = [];
+        for (let i = 0; i < result.length - 1; i++) {
+          const p0 = result[i];
+          const p1 = result[i + 1];
+          newPoints.push(p0);
+          newPoints.push({ x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 });
+        }
+        newPoints.push(result[result.length - 1]);
+        result = newPoints;
+      }
+    }
+  }
+
+  // Apply smoothing
+  if (modifiers.smooth) {
+    const strength = modifiers.smooth.strength ? evalExpr(modifiers.smooth.strength, scope) : 0.5;
+    const iterations = modifiers.smooth.iterations ? evalExpr(modifiers.smooth.iterations, scope) : 1;
+
+    for (let iter = 0; iter < iterations; iter++) {
+      const smoothed: EvalPoint[] = [result[0]];
+      for (let i = 1; i < result.length - 1; i++) {
+        const prev = result[i - 1];
+        const curr = result[i];
+        const next = result[i + 1];
+        smoothed.push({
+          x: curr.x + ((prev.x + next.x) / 2 - curr.x) * strength,
+          y: curr.y + ((prev.y + next.y) / 2 - curr.y) * strength
+        });
+      }
+      smoothed.push(result[result.length - 1]);
+      result = smoothed;
+    }
+  }
+
+  // Apply mirror
+  if (modifiers.mirror) {
+    const axis = evalExpr(modifiers.mirror.axis, scope);
+    const includeOriginal = modifiers.mirror.includeOriginal !== undefined 
+      ? evalExpr(modifiers.mirror.includeOriginal, scope) 
+      : true;
+
+    // Calculate center if 'at' not specified
+    let atX: number | undefined;
+    let atY: number | undefined;
+    if (modifiers.mirror.at !== undefined) {
+      const at = evalExpr(modifiers.mirror.at, scope);
+      atX = at;
+      atY = at;
+    } else {
+      // Use center of bounding box
+      const xs = result.map(p => p.x);
+      const ys = result.map(p => p.y);
+      atX = (Math.min(...xs) + Math.max(...xs)) / 2;
+      atY = (Math.min(...ys) + Math.max(...ys)) / 2;
+    }
+
+    const mirrored: EvalPoint[] = [];
+    
+    if (includeOriginal) {
+      mirrored.push(...result);
+    }
+
+    for (const p of result) {
+      if (axis === 'x' || axis === 'both') {
+        mirrored.push({ x: 2 * atX! - p.x, y: p.y });
+      }
+      if (axis === 'y' || axis === 'both') {
+        mirrored.push({ x: p.x, y: 2 * atY! - p.y });
+      }
+      if (axis === 'both') {
+        // Also add the corner reflection
+        mirrored.push({ x: 2 * atX! - p.x, y: 2 * atY! - p.y });
+      }
+    }
+
+    result = mirrored;
+  }
+
+  return result;
+}
+
+/** Check if data has any point modifiers */
+function hasPointModifiers(data: PointModifiers): boolean {
+  return !!(data.noise || data.jitter || data.subdivide || data.smooth || data.mirror);
+}
+
 /** Get iterator from point-based shape data */
 function getPointIterator(data: PathData | PolylineData | PolygonData, scope: Record<string, ScopeValue>): Generator<IteratorStep> | null {
   if (data.for) return iterateFor(data.for, scope);
@@ -1482,6 +1791,7 @@ function getShapeIterators(data: ShapeIteratorProps, scope: Record<string, Scope
   if (data.pack) result.push({ iterator: iteratePack(data.pack, scope), output: data.pack as AnyShapeOutput });
   if (data.random) result.push({ iterator: iterateRandom(data.random, scope), output: data.random as AnyShapeOutput });
   if (data.poisson) result.push({ iterator: iteratePoisson(data.poisson, scope), output: data.poisson as AnyShapeOutput });
+  if (data.noise) result.push({ iterator: iterateNoise(data.noise, scope), output: data.noise as AnyShapeOutput });
   // Not yet implemented
   if (data.distribute) throw new Error('DistributeIterator not yet implemented');
   return result;
