@@ -429,6 +429,14 @@ function getPointIterator(data: PathData | PolylineData | PolygonData, scope: Re
   if (data.lissajous) return iterateLissajous(data.lissajous, scope);
   if (data.rose) return iterateRose(data.rose, scope);
   if (data.parametric) return iterateParametric(data.parametric, scope);
+  // Not yet implemented
+  if (data.grid) throw new Error('GridIterator not yet implemented');
+  if (data.superformula) throw new Error('SuperformulaIterator not yet implemented');
+  if (data.epitrochoid) throw new Error('EpitrochoidIterator not yet implemented');
+  if (data.hypotrochoid) throw new Error('HypotrochoidIterator not yet implemented');
+  if (data.fractal) throw new Error('FractalIterator not yet implemented');
+  if (data.attractor) throw new Error('AttractorIterator not yet implemented');
+  if (data.flowfield) throw new Error('FlowfieldIterator not yet implemented');
   return null;
 }
 
@@ -453,6 +461,19 @@ function getShapeIterators(data: ShapeIteratorProps, scope: Record<string, Scope
   if (data.lissajous) result.push({ iterator: iterateLissajous(data.lissajous, scope), output: data.lissajous as AnyShapeOutput });
   if (data.rose) result.push({ iterator: iterateRose(data.rose, scope), output: data.rose as AnyShapeOutput });
   if (data.parametric) result.push({ iterator: iterateParametric(data.parametric, scope), output: data.parametric as AnyShapeOutput });
+  // Not yet implemented
+  if (data.grid) throw new Error('GridIterator not yet implemented');
+  if (data.superformula) throw new Error('SuperformulaIterator not yet implemented');
+  if (data.epitrochoid) throw new Error('EpitrochoidIterator not yet implemented');
+  if (data.hypotrochoid) throw new Error('HypotrochoidIterator not yet implemented');
+  if (data.fractal) throw new Error('FractalIterator not yet implemented');
+  if (data.attractor) throw new Error('AttractorIterator not yet implemented');
+  if (data.flowfield) throw new Error('FlowfieldIterator not yet implemented');
+  if (data.voronoi) throw new Error('VoronoiIterator not yet implemented');
+  if (data.delaunay) throw new Error('DelaunayIterator not yet implemented');
+  if (data.tile) throw new Error('TileIterator not yet implemented');
+  if (data.pack) throw new Error('PackIterator not yet implemented');
+  if (data.distribute) throw new Error('DistributeIterator not yet implemented');
   return result;
 }
 

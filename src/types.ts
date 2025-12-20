@@ -160,6 +160,42 @@ export type RoseIteratorScope = Scope & { x: number; y: number; theta: number; r
 /** Parametric iterator provides x, y, t, i */
 export type ParametricIteratorScope = Scope & { x: number; y: number; t: number; i: number };
 
+/** Superformula iterator provides x, y, theta, r, t, i */
+export type SuperformulaIteratorScope = Scope & { x: number; y: number; theta: number; r: number; t: number; i: number };
+
+/** Epitrochoid iterator provides x, y, theta, t, i */
+export type EpitrochoidIteratorScope = Scope & { x: number; y: number; theta: number; t: number; i: number };
+
+/** Hypotrochoid iterator provides x, y, theta, t, i */
+export type HypotrochoidIteratorScope = Scope & { x: number; y: number; theta: number; t: number; i: number };
+
+/** Flowfield iterator provides x, y, vx, vy, t, i */
+export type FlowfieldIteratorScope = Scope & { x: number; y: number; vx: number; vy: number; t: number; i: number };
+
+/** Attractor iterator provides x, y, z, t, i */
+export type AttractorIteratorScope = Scope & { x: number; y: number; z: number; t: number; i: number };
+
+/** Fractal iterator provides x1, y1, x2, y2, depth, i */
+export type FractalIteratorScope = Scope & { x1: number; y1: number; x2: number; y2: number; depth: number; i: number };
+
+/** Voronoi iterator provides x, y (cell center), vertices (cell polygon), i */
+export type VoronoiIteratorScope = Scope & { x: number; y: number; vertices: [number, number][]; i: number };
+
+/** Delaunay iterator provides x1, y1, x2, y2, x3, y3 (triangle vertices), cx, cy (centroid), i */
+export type DelaunayIteratorScope = Scope & { x1: number; y1: number; x2: number; y2: number; x3: number; y3: number; cx: number; cy: number; i: number };
+
+/** Tile iterator provides x, y (tile center), vertices (tile polygon), row, col, i */
+export type TileIteratorScope = Scope & { x: number; y: number; vertices: [number, number][]; row: number; col: number; i: number };
+
+/** Pack iterator provides x, y, r (packed circle), i */
+export type PackIteratorScope = Scope & { x: number; y: number; r: number; i: number };
+
+/** Distribute iterator provides x, y, t, i */
+export type DistributeIteratorScope = Scope & { x: number; y: number; t: number; i: number };
+
+/** Grid iterator provides x, y, row, col, i, t */
+export type GridIteratorScope = Scope & { x: number; y: number; row: number; col: number; i: number; t: number };
+
 // ============================================================================
 // Iterator Types (provide scope variables at each step)
 // ============================================================================
@@ -170,6 +206,22 @@ export interface ForIterator extends ScopeProps<ForIteratorScope> {
   i: number;
   /** End index (exclusive) */
   to: Expr<number>;
+}
+
+/** Grid iterator - provides x, y, row, col, i, t in scope */
+export interface GridIterator extends ScopeProps<GridIteratorScope> {
+  /** Number of columns */
+  cols: Expr<number>;
+  /** Number of rows */
+  rows: Expr<number>;
+  /** Cell width (default: 1) */
+  cellWidth?: Expr<number>;
+  /** Cell height (default: 1) */
+  cellHeight?: Expr<number>;
+  /** X offset (default: 0) */
+  x?: Expr<number>;
+  /** Y offset (default: 0) */
+  y?: Expr<number>;
 }
 
 /** Spiral iterator - provides x, y, t, theta, r, i in scope */
@@ -212,6 +264,150 @@ export interface ParametricIterator extends ScopeProps<ParametricIteratorScope> 
   samples?: Expr<number>;
 }
 
+/** Superformula iterator - Gielis superformula for generalized shapes */
+export interface SuperformulaIterator extends ScopeProps<SuperformulaIteratorScope> {
+  cx: Expr<number>;
+  cy: Expr<number>;
+  /** Scale factor */
+  scale?: Expr<number>;
+  /** Symmetry parameter (number of rotational symmetries) */
+  m: Expr<number>;
+  /** Shape parameters */
+  n1: Expr<number>;
+  n2: Expr<number>;
+  n3: Expr<number>;
+  /** Optional a, b parameters (default 1) */
+  a?: Expr<number>;
+  b?: Expr<number>;
+  samples?: Expr<number>;
+}
+
+/** Epitrochoid iterator - curve traced by point on circle rolling outside another circle */
+export interface EpitrochoidIterator extends ScopeProps<EpitrochoidIteratorScope> {
+  cx: Expr<number>;
+  cy: Expr<number>;
+  /** Radius of fixed circle */
+  R: Expr<number>;
+  /** Radius of rolling circle */
+  r: Expr<number>;
+  /** Distance from center of rolling circle to tracing point */
+  d: Expr<number>;
+  /** Number of revolutions */
+  revolutions?: Expr<number>;
+  samples?: Expr<number>;
+}
+
+/** Hypotrochoid iterator - curve traced by point on circle rolling inside another circle */
+export interface HypotrochoidIterator extends ScopeProps<HypotrochoidIteratorScope> {
+  cx: Expr<number>;
+  cy: Expr<number>;
+  /** Radius of fixed circle */
+  R: Expr<number>;
+  /** Radius of rolling circle */
+  r: Expr<number>;
+  /** Distance from center of rolling circle to tracing point */
+  d: Expr<number>;
+  /** Number of revolutions */
+  revolutions?: Expr<number>;
+  samples?: Expr<number>;
+}
+
+/** Flowfield iterator - points following a vector field */
+export interface FlowfieldIterator extends ScopeProps<FlowfieldIteratorScope> {
+  /** Vector field function returning [vx, vy] for each position */
+  field: ($: Scope & { x: number; y: number }) => [number, number];
+  /** Starting points or grid definition */
+  start: { x: Expr<number>; y: Expr<number> }[] | { cols: Expr<number>; rows: Expr<number>; width: Expr<number>; height: Expr<number> };
+  /** Number of steps to follow field */
+  steps: Expr<number>;
+  /** Step size */
+  stepSize?: Expr<number>;
+}
+
+/** Attractor iterator - strange attractor (Lorenz, etc.) */
+export interface AttractorIterator extends ScopeProps<AttractorIteratorScope> {
+  /** Attractor type */
+  type: Expr<'lorenz' | 'rossler' | 'thomas' | 'aizawa' | 'halvorsen'>;
+  /** Center position for 2D projection */
+  cx: Expr<number>;
+  cy: Expr<number>;
+  /** Scale factor */
+  scale?: Expr<number>;
+  /** Number of iterations */
+  iterations: Expr<number>;
+  /** Time step (dt) */
+  dt?: Expr<number>;
+  /** Attractor-specific parameters */
+  params?: Record<string, Expr<number>>;
+}
+
+/** Fractal iterator - L-system or recursive fractal curves */
+export interface FractalIterator extends ScopeProps<FractalIteratorScope> {
+  /** Fractal type */
+  type: Expr<'koch' | 'dragon' | 'hilbert' | 'sierpinski' | 'levy'>;
+  /** Starting position */
+  x: Expr<number>;
+  y: Expr<number>;
+  /** Initial segment length */
+  length: Expr<number>;
+  /** Initial angle (degrees) */
+  angle?: Expr<number>;
+  /** Recursion depth */
+  depth: Expr<number>;
+}
+
+/** Voronoi iterator - iterates over Voronoi cells from seed points */
+export interface VoronoiIterator extends ScopeProps<VoronoiIteratorScope> {
+  /** Seed points */
+  points: [Expr<number>, Expr<number>][];
+  /** Bounding box */
+  bounds?: { x: Expr<number>; y: Expr<number>; width: Expr<number>; height: Expr<number> };
+}
+
+/** Delaunay iterator - iterates over Delaunay triangles from points */
+export interface DelaunayIterator extends ScopeProps<DelaunayIteratorScope> {
+  /** Input points */
+  points: [Expr<number>, Expr<number>][];
+}
+
+/** Tile iterator - regular tiling patterns */
+export interface TileIterator extends ScopeProps<TileIteratorScope> {
+  /** Tile type */
+  type: Expr<'square' | 'hex' | 'triangle' | 'penrose'>;
+  /** Tile size */
+  size: Expr<number>;
+  /** Grid dimensions */
+  cols: Expr<number>;
+  rows: Expr<number>;
+  /** Origin offset */
+  x?: Expr<number>;
+  y?: Expr<number>;
+}
+
+/** Pack iterator - circle packing */
+export interface PackIterator extends ScopeProps<PackIteratorScope> {
+  /** Bounding shape */
+  bounds: { type: 'circle'; cx: Expr<number>; cy: Expr<number>; r: Expr<number> }
+    | { type: 'rect'; x: Expr<number>; y: Expr<number>; width: Expr<number>; height: Expr<number> };
+  /** Number of circles to pack */
+  count: Expr<number>;
+  /** Min/max radius */
+  minRadius?: Expr<number>;
+  maxRadius?: Expr<number>;
+  /** Padding between circles */
+  padding?: Expr<number>;
+}
+
+/** Distribute iterator - evenly distribute points along a path or within an area */
+export interface DistributeIterator extends ScopeProps<DistributeIteratorScope> {
+  /** Number of points */
+  count: Expr<number>;
+  /** Distribution mode */
+  along?: { path: PathData } | { circle: { cx: Expr<number>; cy: Expr<number>; r: Expr<number> } };
+  within?: { rect: { x: Expr<number>; y: Expr<number>; width: Expr<number>; height: Expr<number> } }
+    | { circle: { cx: Expr<number>; cy: Expr<number>; r: Expr<number> } };
+}
+
 // ============================================================================
 // Iterator Output Types (what iterators produce)
 // ============================================================================
@@ -235,37 +431,6 @@ export interface ShapeOutput<S extends Scope = Scope> {
   group?: OneOrMany<GroupData>;
 }
 
-// These "shapes" aren't implement and may become iterators or modifiers instead
-interface NOT_YET_IMPLEMENT {
-  // Curve generators (not yet implemented)
-  bezier?: OneOrMany<BezierData>;
-  spline?: OneOrMany<SplineData>;
-
-  // Fractals & recursive (not yet implemented)
-  fractal?: OneOrMany<FractalData>;
-  recursive?: OneOrMany<RecursiveData>;
-
-  // Field-based generation (not yet implemented)
-  flowfield?: OneOrMany<FlowFieldData>;
-  attractor?: OneOrMany<AttractorData>;
-  isoline?: OneOrMany<IsolineData>;
-
-  // Complex parametric curves (not yet implemented)
-  superformula?: OneOrMany<SuperformulaData>;
-  epitrochoid?: OneOrMany<EpitrochoidData>;
-  hypotrochoid?: OneOrMany<HypotrochoidData>;
-
-  // Tiling & patterns (not yet implemented)
-  tile?: OneOrMany<TileData>;
-  voronoi?: OneOrMany<VoronoiData>;
-  delaunay?: OneOrMany<DelaunayData>;
-
-  // Constraints & physics (not yet implemented)
-  spring?: OneOrMany<SpringData>;
-  pack?: OneOrMany<PackData>;
-  distribute?: OneOrMany<DistributeData>;
-}
-
 // ============================================================================
 // Point-based Shapes (iterators produce points)
 // ============================================================================
@@ -274,7 +439,7 @@ interface NOT_YET_IMPLEMENT {
 export interface PointIteratorProps {
   /** For loop iterator (point required) */
   for?: ForIterator & PointOutput<ForIteratorScope>;
-  /** Spiral iterator (point optional, defaults to [$.x, $.y]) */
+  /** Spiral iterator */
   spiral?: SpiralIterator & PointOutput<SpiralIteratorScope>;
   /** Lissajous iterator */
   lissajous?: LissajousIterator & PointOutput<LissajousIteratorScope>;
@@ -282,6 +447,20 @@ export interface PointIteratorProps {
   rose?: RoseIterator & PointOutput<RoseIteratorScope>;
   /** Parametric iterator */
   parametric?: ParametricIterator & PointOutput<ParametricIteratorScope>;
+  /** Superformula iterator */
+  superformula?: SuperformulaIterator & PointOutput<SuperformulaIteratorScope>;
+  /** Epitrochoid iterator (spirograph outer) */
+  epitrochoid?: EpitrochoidIterator & PointOutput<EpitrochoidIteratorScope>;
+  /** Hypotrochoid iterator (spirograph inner) */
+  hypotrochoid?: HypotrochoidIterator & PointOutput<HypotrochoidIteratorScope>;
+  /** Fractal iterator */
+  fractal?: FractalIterator & PointOutput<FractalIteratorScope>;
+  /** Attractor iterator */
+  attractor?: AttractorIterator & PointOutput<AttractorIteratorScope>;
+  /** Flowfield iterator */
+  flowfield?: FlowfieldIterator & PointOutput<FlowfieldIteratorScope>;
+  /** Grid iterator */
+  grid?: GridIterator & PointOutput<GridIteratorScope>;
 }
 
 /** Path from points */
@@ -352,253 +531,15 @@ export interface SplineData extends StyleProps, InlineModifiers {
   close?: boolean;
 }
 
-// Note: SpiralData, LissajousData, RoseData, ParametricData are now iterators
-// defined in the Iterators section above (SpiralIterator, etc.)
-
 // ============================================================================
-// Fractals & Recursive
-// ============================================================================
-
-/** L-system fractal definition */
-export interface FractalData extends StyleProps, InlineModifiers {
-  /** Axiom (starting string) */
-  axiom: string;
-  /** Production rules */
-  rules: Record<string, string>;
-  /** Number of iterations */
-  iterations: Expr<number>;
-  /** Step length */
-  length: Expr<number>;
-  /** Turn angle in degrees */
-  angle: Expr<number>;
-  /** Starting position */
-  start?: [Expr<number>, Expr<number>];
-  /** Starting angle */
-  startAngle?: Expr<number>;
-}
-
-/** Recursive self-similar geometry */
-export interface RecursiveData extends StyleProps, InlineModifiers {
-  /** Base shape generator */
-  base: ForIterator;
-  /** Transform to apply at each level */
-  transform: Expr<string>;
-  /** Scale factor per level */
-  scale: Expr<number>;
-  /** Maximum recursion depth */
-  depth: Expr<number>;
-  /** Minimum size to stop recursion */
-  minSize?: Expr<number>;
-}
-
-// ============================================================================
-// Field-Based Generation
-// ============================================================================
-
-/** Points/paths following a vector field */
-export interface FlowFieldData extends StyleProps, InlineModifiers {
-  /** Field function returning angle at (x, y) */
-  field: ($: Scope & { x: number; y: number }) => number;
-  /** Starting points */
-  seeds: [Expr<number>, Expr<number>][] | ForIterator;
-  /** Steps per path */
-  steps: Expr<number>;
-  /** Step size */
-  stepSize: Expr<number>;
-}
-
-/** Strange attractor projected to 2D */
-export interface AttractorData extends StyleProps, InlineModifiers {
-  /** Attractor type or custom equations */
-  type: Expr<'lorenz' | 'clifford' | 'dejong' | 'custom'>;
-  /** Parameters (a, b, c, d, etc.) */
-  params?: Record<string, Expr<number>>;
-  /** Custom equations for 'custom' type */
-  equations?: {
-    x: ($: Scope & { x: number; y: number; z?: number }) => number;
-    y: ($: Scope & { x: number; y: number; z?: number }) => number;
-    z?: ($: Scope & { x: number; y: number; z?: number }) => number;
-  };
-  /** Number of iterations */
-  iterations: Expr<number>;
-  /** Scale factor */
-  scale?: Expr<number>;
-  /** Center offset */
-  cx?: Expr<number>;
-  cy?: Expr<number>;
-}
-
-/** Contour lines from scalar field */
-export interface IsolineData extends StyleProps, InlineModifiers {
-  /** Scalar field function */
-  field: ($: Scope & { x: number; y: number }) => number;
-  /** Contour value(s) */
-  levels: Expr<number> | Expr<number>[];
-  /** Sampling bounds */
-  bounds: {
-    x: [Expr<number>, Expr<number>];
-    y: [Expr<number>, Expr<number>];
-  };
-  /** Grid resolution */
-  resolution?: Expr<number>;
-}
-
-// ============================================================================
-// Complex Parametric Curves (produce paths directly, not iterators)
-// ============================================================================
-
-/** Gielis superformula for organic shapes */
-export interface SuperformulaData extends StyleProps, InlineModifiers {
-  /** Center point */
-  cx: Expr<number>;
-  cy: Expr<number>;
-  /** Scale */
-  scale: Expr<number>;
-  /** Superformula parameters */
-  m: Expr<number>;
-  n1: Expr<number>;
-  n2: Expr<number>;
-  n3: Expr<number>;
-  a?: Expr<number>;
-  b?: Expr<number>;
-  /** Number of samples */
-  samples?: Expr<number>;
-  close?: boolean;
-}
-
-/** Epitrochoid (outer spirograph) */
-export interface EpitrochoidData extends StyleProps, InlineModifiers {
-  /** Center point */
-  cx: Expr<number>;
-  cy: Expr<number>;
-  /** Fixed circle radius */
-  R: Expr<number>;
-  /** Rolling circle radius */
-  r: Expr<number>;
-  /** Pen distance from rolling center */
-  d: Expr<number>;
-  /** Number of rotations */
-  rotations?: Expr<number>;
-  /** Number of samples */
-  samples?: Expr<number>;
-  close?: boolean;
-}
-
-/** Hypotrochoid (inner spirograph) */
-export interface HypotrochoidData extends StyleProps, InlineModifiers {
-  /** Center point */
-  cx: Expr<number>;
-  cy: Expr<number>;
-  /** Fixed circle radius */
-  R: Expr<number>;
-  /** Rolling circle radius */
-  r: Expr<number>;
-  /** Pen distance from rolling center */
-  d: Expr<number>;
-  /** Number of rotations */
-  rotations?: Expr<number>;
-  /** Number of samples */
-  samples?: Expr<number>;
-  close?: boolean;
-}
-
-// ============================================================================
-// Tiling & Patterns
-// ============================================================================
-
-/** Tile with wallpaper group symmetry */
-export interface TileData extends StyleProps {
-  /** Base tile geometry */
-  tile: Generator;
-  /** Wallpaper group: 'p1' | 'p2' | 'pm' | 'pg' | 'cm' | 'p4' | 'p4m' | 'p6' | 'p6m' etc. */
-  symmetry: Expr<string>;
-  /** Tile size */
-  size: [Expr<number>, Expr<number>];
-  /** Grid dimensions */
-  grid: [Expr<number>, Expr<number>];
-}
-
-/** Voronoi diagram from seed points */
-export interface VoronoiData extends StyleProps, InlineModifiers {
-  /** Seed points */
-  seeds: [Expr<number>, Expr<number>][] | ForIterator;
-  /** Bounding box */
-  bounds: {
-    x: [Expr<number>, Expr<number>];
-    y: [Expr<number>, Expr<number>];
-  };
-  /** Output: 'cells' | 'edges' | 'both' */
-  output?: Expr<'cells' | 'edges' | 'both'>;
-}
-
-/** Delaunay triangulation */
-export interface DelaunayData extends StyleProps, InlineModifiers {
-  /** Points to triangulate */
-  points: [Expr<number>, Expr<number>][] | ForIterator;
-  /** Output: 'triangles' | 'edges' | 'both' */
-  output?: Expr<'triangles' | 'edges' | 'both'>;
-}
-
-// ============================================================================
-// Constraints & Physics
-// ============================================================================
-
-/** Spring-connected points relaxation */
-export interface SpringData extends StyleProps, InlineModifiers {
-  /** Initial points */
-  points: [Expr<number>, Expr<number>][] | ForIterator;
-  /** Spring connections: pairs of point indices */
-  connections: [number, number][];
-  /** Rest length (or 'auto' for initial distances) */
-  restLength?: Expr<number> | 'auto';
-  /** Spring stiffness */
-  stiffness?: Expr<number>;
-  /** Relaxation iterations */
-  iterations?: Expr<number>;
-  /** Fixed point indices */
-  fixed?: number[];
-}
-
-/** Circle packing within boundary */
-export interface PackData extends StyleProps {
-  /** Number of circles */
-  count: Expr<number>;
-  /** Boundary shape */
-  boundary: CircleData | RectData | ForIterator;
-  /** Min/max radius */
-  radius: [Expr<number>, Expr<number>];
-  /** Packing iterations */
-  iterations?: Expr<number>;
-  /** Random seed */
-  seed?: Expr<number>;
-}
-
-/** Poisson disk distribution */
-export interface DistributeData extends StyleProps {
-  /** Bounding area */
-  bounds: {
-    x: [Expr<number>, Expr<number>];
-    y: [Expr<number>, Expr<number>];
-  };
-  /** Minimum distance between points */
-  minDistance: Expr<number>;
-  /** Maximum attempts per point */
-  maxAttempts?: Expr<number>;
-  /** Random seed */
-  seed?: Expr<number>;
-  /** Output as circles with given radius */
-  asCircles?: Expr<number>;
-}
-
-// ============================================================================
-// Generator Union Type & Helpers
+// Union Types & Helpers
 // ============================================================================
 
 /** Single item or array of items */
 type OneOrMany<T> = T | T[];
 
-/** Union of all shape/generator types */
-export type Generator =
+/** Union of all shape types */
+export type Shape =
   | PathData
   | PolylineData
   | PolygonData
@@ -606,28 +547,27 @@ export type Generator =
   | RectData
   | LineData
   | BezierData
-  | SplineData
-  | FractalData
-  | RecursiveData
-  | FlowFieldData
-  | AttractorData
-  | IsolineData
-  | SuperformulaData
-  | EpitrochoidData
-  | HypotrochoidData
-  | VoronoiData
-  | DelaunayData
-  | SpringData
-  | PackData
-  | DistributeData;
+  | SplineData;
 
 /** Union of all iterator types */
 export type Iterator =
   | ForIterator
+  | GridIterator
   | SpiralIterator
   | LissajousIterator
   | RoseIterator
-  | ParametricIterator;
+  | ParametricIterator
+  | SuperformulaIterator
+  | EpitrochoidIterator
+  | HypotrochoidIterator
+  | FractalIterator
+  | AttractorIterator
+  | FlowfieldIterator
+  | VoronoiIterator
+  | DelaunayIterator
+  | TileIterator
+  | PackIterator
+  | DistributeIterator;
 
 // ============================================================================
 // Iterator Properties (shared by SvgDef and GroupData)
@@ -635,16 +575,40 @@ export type Iterator =
 
 /** Shape iterators that produce shapes at each step */
 export interface ShapeIteratorProps {
-  /** For loop iterator that produces shapes */
+  /** For loop iterator */
   for?: ForIterator & ShapeOutput<ForIteratorScope>;
-  /** Spiral iterator that produces shapes */
+  /** Spiral iterator */
   spiral?: SpiralIterator & ShapeOutput<SpiralIteratorScope>;
-  /** Lissajous iterator that produces shapes */
+  /** Lissajous iterator */
   lissajous?: LissajousIterator & ShapeOutput<LissajousIteratorScope>;
-  /** Rose iterator that produces shapes */
+  /** Rose iterator */
   rose?: RoseIterator & ShapeOutput<RoseIteratorScope>;
-  /** Parametric iterator that produces shapes */
+  /** Parametric iterator */
   parametric?: ParametricIterator & ShapeOutput<ParametricIteratorScope>;
+  /** Superformula iterator */
+  superformula?: SuperformulaIterator & ShapeOutput<SuperformulaIteratorScope>;
+  /** Epitrochoid iterator */
+  epitrochoid?: EpitrochoidIterator & ShapeOutput<EpitrochoidIteratorScope>;
+  /** Hypotrochoid iterator */
+  hypotrochoid?: HypotrochoidIterator & ShapeOutput<HypotrochoidIteratorScope>;
+  /** Fractal iterator */
+  fractal?: FractalIterator & ShapeOutput<FractalIteratorScope>;
+  /** Attractor iterator */
+  attractor?: AttractorIterator & ShapeOutput<AttractorIteratorScope>;
+  /** Flowfield iterator */
+  flowfield?: FlowfieldIterator & ShapeOutput<FlowfieldIteratorScope>;
+  /** Voronoi iterator */
+  voronoi?: VoronoiIterator & ShapeOutput<VoronoiIteratorScope>;
+  /** Delaunay iterator */
+  delaunay?: DelaunayIterator & ShapeOutput<DelaunayIteratorScope>;
+  /** Tile iterator */
+  tile?: TileIterator & ShapeOutput<TileIteratorScope>;
+  /** Pack iterator */
+  pack?: PackIterator & ShapeOutput<PackIteratorScope>;
+  /** Distribute iterator */
+  distribute?: DistributeIterator & ShapeOutput<DistributeIteratorScope>;
+  /** Grid iterator */
+  grid?: GridIterator & ShapeOutput<GridIteratorScope>;
 }
 
 // ============================================================================
