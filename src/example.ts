@@ -1290,3 +1290,704 @@ const mirrorBoth: SvgDef = {
 };
 
 output('mirror-both', mirrorBoth);
+
+// ============================================================================
+// Showcase Examples - Complex Generative Art
+// ============================================================================
+
+// Organic Mandala - layered spirals with noise and mirroring
+const organicMandala: SvgDef = {
+  size: [600, 600],
+
+  let: {
+    cx: 300,
+    cy: 300
+  },
+
+  group: [
+    // Background gradient circles
+    {
+      for: {
+        i: 0,
+        to: 20,
+        let: {
+          r: $ => 280 - $.i * 14
+        },
+        circle: {
+          cx: $ => $.cx,
+          cy: $ => $.cy,
+          r: $ => $.r,
+          fill: $ => `hsl(${220 + $.i * 8}, 40%, ${15 + $.i * 2}%)`,
+          stroke: 'none'
+        }
+      }
+    },
+    // Inner spiraling petals
+    {
+      for: {
+        i: 0,
+        to: 12,
+        let: {
+          rotation: $ => $.i * 30
+        },
+        path: {
+          for: {
+            i: 0,
+            to: 40,
+            let: {
+              t: $ => $.i / 39,
+              angle: $ => $.t * Math.PI * 0.8 + ($.rotation * Math.PI / 180),
+              r: $ => 20 + $.t * 100
+            },
+            point: [
+              $ => $.cx + Math.cos($.angle) * $.r,
+              $ => $.cy + Math.sin($.angle) * $.r
+            ]
+          },
+          noise: { scale: 0.03, amplitude: 8, seed: $ => $.i * 100 },
+          stroke: $ => `hsla(${40 + $.i * 25}, 80%, 60%, 0.7)`,
+          strokeWidth: 2,
+          fill: 'none'
+        }
+      }
+    },
+    // Outer decorative ring
+    {
+      for: {
+        i: 0,
+        to: 36,
+        let: {
+          angle: $ => $.i * 10 * Math.PI / 180,
+          dist: 240
+        },
+        circle: {
+          cx: $ => $.cx + Math.cos($.angle) * $.dist,
+          cy: $ => $.cy + Math.sin($.angle) * $.dist,
+          r: $ => 8 + Math.sin($.i * 0.5) * 4,
+          fill: $ => `hsl(${$.i * 10}, 70%, 65%)`,
+          stroke: 'white',
+          strokeWidth: 1
+        }
+      }
+    },
+    // Center flower
+    {
+      for: {
+        i: 0,
+        to: 8,
+        let: {
+          angle: $ => $.i * 45 * Math.PI / 180
+        },
+        path: {
+          superformula: {
+            cx: $ => $.cx + Math.cos($.angle) * 40,
+            cy: $ => $.cy + Math.sin($.angle) * 40,
+            scale: 25,
+            m: 4,
+            n1: 0.5,
+            n2: 0.5,
+            n3: 0.5,
+            samples: 60
+          },
+          close: true,
+          fill: $ => `hsla(${50 + $.i * 10}, 90%, 70%, 0.6)`,
+          stroke: 'white',
+          strokeWidth: 1
+        }
+      }
+    },
+    // Center circle
+    {
+      circle: {
+        cx: $ => $.cx,
+        cy: $ => $.cy,
+        r: 20,
+        fill: 'gold',
+        stroke: 'orange',
+        strokeWidth: 3
+      }
+    }
+  ]
+};
+
+output('organic-mandala', organicMandala);
+
+// Crystalline Structure - Delaunay with gradient fills and noise
+const crystallineStructure: SvgDef = {
+  size: [600, 600],
+
+  collect: {
+    points: {
+      poisson: {
+        radius: 35,
+        bounds: { x: 30, y: 30, width: 540, height: 540 },
+        seed: 777
+      }
+    },
+    delaunay: {
+      points: $ => $.points,
+      polygon: {
+        points: $ => $.vertices,
+        fill: $ => {
+          const hue = ($.cx + $.cy) * 0.3;
+          const light = 40 + ($.cx * 0.05);
+          return `hsla(${180 + hue}, 60%, ${light}%, 0.85)`;
+        },
+        stroke: $ => `hsla(${200 + $.i * 2}, 80%, 80%, 0.5)`,
+        strokeWidth: 1,
+        // Add subtle noise to each triangle
+        noise: { scale: 0.01, amplitude: 3, seed: $ => $.i }
+      }
+    }
+  }
+};
+
+output('crystalline-structure', crystallineStructure);
+
+// Flowing Curves - Multiple spiral paths with noise
+const flowingCurves: SvgDef = {
+  size: [600, 600],
+
+  group: [
+    // Dark background
+    {
+      rect: {
+        x: 0, y: 0, width: 600, height: 600,
+        fill: '#1a1a2e',
+        stroke: 'none'
+      }
+    },
+    // Multiple flowing curves
+    {
+      for: {
+        i: 0,
+        to: 12,
+        let: {
+          offset: $ => $.i * 30,
+          hue: $ => 200 + $.i * 15
+        },
+        path: {
+          spiral: {
+            cx: 300,
+            cy: 300,
+            startRadius: $ => 30 + $.offset,
+            endRadius: $ => 200 + $.offset * 0.5,
+            turns: 2,
+            samples: 80
+          },
+          noise: { scale: 0.015, amplitude: 20, seed: $ => $.i * 50 },
+          subdivide: { iterations: 1, algorithm: 'chaikin' },
+          stroke: $ => `hsla(${$.hue}, 80%, 60%, 0.6)`,
+          strokeWidth: 2,
+          fill: 'none'
+        }
+      }
+    },
+    // Center glow
+    {
+      for: {
+        i: 0,
+        to: 5,
+        let: { r: $ => 40 - $.i * 8 },
+        circle: {
+          cx: 300,
+          cy: 300,
+          r: $ => $.r,
+          fill: $ => `hsla(220, 80%, ${70 + $.i * 5}%, ${0.2 + $.i * 0.1})`,
+          stroke: 'none'
+        }
+      }
+    }
+  ]
+};
+
+output('flowing-curves', flowingCurves);
+
+// Organic Foliage - Noise-driven leaf pattern
+const organicFoliage: SvgDef = {
+  size: [600, 600],
+
+  group: [
+    // Sky gradient
+    {
+      for: {
+        i: 0,
+        to: 12,
+        let: {
+          y: $ => $.i * 50,
+          h: 50
+        },
+        rect: {
+          x: 0,
+          y: $ => $.y,
+          width: 600,
+          height: $ => $.h + 1,
+          fill: $ => `hsl(200, ${50 - $.i * 2}%, ${85 - $.i * 3}%)`,
+          stroke: 'none'
+        }
+      }
+    },
+    // Leaves using noise grid
+    {
+      noise: {
+        cols: 20,
+        rows: 20,
+        scale: 3,
+        octaves: 2,
+        seed: 42,
+        bounds: { x: 50, y: 50, width: 500, height: 500 },
+        circle: {
+          cx: $ => $.x + ($.value * 12),
+          cy: $ => $.y + ($.value * 8),
+          r: $ => Math.max(4, 10 + $.value * 6),
+          fill: $ => {
+            const v = $.value;
+            if (v < -0.3) return '#1a472a';
+            if (v < 0) return '#2d5a27';
+            if (v < 0.3) return '#4a7c42';
+            if (v < 0.6) return '#6b8e23';
+            return '#8fbc8f';
+          },
+          stroke: $ => `hsla(120, 40%, ${20 + $.value * 10}%, 0.3)`,
+          strokeWidth: 1
+        }
+      }
+    }
+  ]
+};
+
+output('organic-foliage', organicFoliage);
+
+// Cosmic Spiral Galaxy
+const cosmicGalaxy: SvgDef = {
+  size: [600, 600],
+
+  let: {
+    cx: 300,
+    cy: 300
+  },
+
+  group: [
+    // Deep space background
+    {
+      rect: {
+        x: 0, y: 0, width: 600, height: 600,
+        fill: '#0a0a15',
+        stroke: 'none'
+      }
+    },
+    // Background stars
+    {
+      random: {
+        count: 200,
+        bounds: { x: 0, y: 0, width: 600, height: 600 },
+        seed: 999,
+        circle: {
+          cx: $ => $.x,
+          cy: $ => $.y,
+          r: $ => 0.5 + Math.random() * 1.5,
+          fill: $ => `hsla(${200 + Math.random() * 60}, 50%, ${70 + Math.random() * 30}%, ${0.3 + Math.random() * 0.7})`,
+          stroke: 'none'
+        }
+      }
+    },
+    // Galaxy core glow
+    {
+      for: {
+        i: 0,
+        to: 8,
+        let: {
+          r: $ => 80 - $.i * 10
+        },
+        circle: {
+          cx: $ => $.cx,
+          cy: $ => $.cy,
+          r: $ => $.r,
+          fill: $ => `hsla(45, 100%, ${90 - $.i * 5}%, ${0.1 + $.i * 0.02})`,
+          stroke: 'none'
+        }
+      }
+    },
+    // Spiral arms
+    {
+      for: {
+        i: 0,
+        to: 3,
+        let: {
+          armOffset: $ => $.i * 120 * Math.PI / 180
+        },
+        path: {
+          spiral: {
+            cx: $ => $.cx,
+            cy: $ => $.cy,
+            startRadius: 30,
+            endRadius: 250,
+            turns: 1.5,
+            samples: 100
+          },
+          noise: { scale: 0.02, amplitude: 15, seed: $ => $.i * 123 },
+          stroke: $ => `hsla(${200 + $.i * 40}, 70%, 70%, 0.4)`,
+          strokeWidth: 20,
+          fill: 'none'
+        }
+      }
+    },
+    // Star clusters along spiral
+    {
+      spiral: {
+        cx: $ => $.cx,
+        cy: $ => $.cy,
+        startRadius: 40,
+        endRadius: 220,
+        turns: 1.3,
+        samples: 60,
+        circle: {
+          cx: $ => $.x + (Math.random() - 0.5) * 30,
+          cy: $ => $.y + (Math.random() - 0.5) * 30,
+          r: $ => 1 + Math.random() * 3,
+          fill: $ => `hsla(${50 + $.t * 150}, 80%, ${70 + Math.random() * 30}%, ${0.5 + $.t * 0.5})`,
+          stroke: 'none'
+        }
+      }
+    },
+    // Bright center
+    {
+      circle: {
+        cx: $ => $.cx,
+        cy: $ => $.cy,
+        r: 15,
+        fill: 'white',
+        stroke: 'none'
+      }
+    }
+  ]
+};
+
+output('cosmic-galaxy', cosmicGalaxy);
+
+// Art Deco Pattern - Synthwave color palette
+const artDecoPattern: SvgDef = {
+  size: [600, 600],
+
+  group: [
+    // Dark purple/black background
+    {
+      rect: {
+        x: 0, y: 0, width: 600, height: 600,
+        fill: '#0d0221',
+        stroke: 'none'
+      }
+    },
+    // Radiating lines from center - cyan/magenta gradient
+    {
+      for: {
+        i: 0,
+        to: 36,
+        let: {
+          angle: $ => $.i * 10 * Math.PI / 180
+        },
+        line: {
+          x1: 300,
+          y1: 300,
+          x2: $ => 300 + Math.cos($.angle) * 400,
+          y2: $ => 300 + Math.sin($.angle) * 400,
+          stroke: $ => `hsl(${280 + $.i * 3}, 100%, 60%)`,
+          strokeWidth: 1
+        }
+      }
+    },
+    // Concentric hexagonal rings - neon cyan
+    {
+      for: {
+        i: 0,
+        to: 6,
+        let: {
+          r: $ => 50 + $.i * 45
+        },
+        polygon: {
+          for: {
+            i: 0,
+            to: 6,
+            let: {
+              angle: $ => $.i * Math.PI * 2 / 6
+            },
+            point: [
+              $ => 300 + Math.cos($.angle) * $.r,
+              $ => 300 + Math.sin($.angle) * $.r
+            ]
+          },
+          fill: 'none',
+          stroke: $ => `hsla(${180 + $.i * 15}, 100%, 50%, 0.8)`,
+          strokeWidth: 2
+        }
+      }
+    },
+    // Center sunburst - hot pink rays
+    {
+      for: {
+        i: 0,
+        to: 12,
+        let: {
+          angle: $ => $.i * 30 * Math.PI / 180
+        },
+        path: {
+          for: {
+            i: 0,
+            to: 4,
+            let: {
+              t: $ => $.i / 3,
+              dist: $ => $.t * 60
+            },
+            point: [
+              $ => 300 + Math.cos($.angle) * $.dist,
+              $ => 300 + Math.sin($.angle) * $.dist
+            ]
+          },
+          stroke: '#ff2a6d',
+          strokeWidth: 3,
+          fill: 'none'
+        }
+      }
+    },
+    // Decorative circles - alternating cyan and magenta
+    {
+      for: {
+        i: 0,
+        to: 24,
+        let: {
+          angle: $ => $.i * 15 * Math.PI / 180,
+          dist: 200
+        },
+        circle: {
+          cx: $ => 300 + Math.cos($.angle) * $.dist,
+          cy: $ => 300 + Math.sin($.angle) * $.dist,
+          r: 6,
+          fill: $ => $.i % 2 === 0 ? '#00fff9' : '#ff2a6d',
+          stroke: $ => $.i % 2 === 0 ? '#05ffa1' : '#d600ff',
+          strokeWidth: 1
+        }
+      }
+    },
+    // Outer glow ring
+    {
+      for: {
+        i: 0,
+        to: 3,
+        let: { r: $ => 270 + $.i * 8 },
+        circle: {
+          cx: 300,
+          cy: 300,
+          r: $ => $.r,
+          fill: 'none',
+          stroke: $ => `hsla(${300 - $.i * 20}, 100%, 60%, ${0.3 - $.i * 0.08})`,
+          strokeWidth: 2
+        }
+      }
+    },
+    // Center jewel - neon glow effect
+    {
+      for: {
+        i: 0,
+        to: 4,
+        let: { r: $ => 30 - $.i * 5 },
+        circle: {
+          cx: 300,
+          cy: 300,
+          r: $ => $.r,
+          fill: $ => $.i === 3 ? '#00fff9' : 'none',
+          stroke: $ => `hsla(180, 100%, ${60 + $.i * 10}%, ${0.5 + $.i * 0.15})`,
+          strokeWidth: $ => 3 - $.i * 0.5
+        }
+      }
+    }
+  ]
+};
+
+output('art-deco-pattern', artDecoPattern);
+
+// Bioluminescent Ocean - Voronoi cells with glowing effect
+const bioluminescentOcean: SvgDef = {
+  size: [600, 600],
+
+  group: [
+    // Deep ocean background
+    {
+      for: {
+        i: 0,
+        to: 12,
+        let: {
+          y: $ => $.i * 50,
+          h: 50
+        },
+        rect: {
+          x: 0,
+          y: $ => $.y,
+          width: 600,
+          height: $ => $.h + 1,
+          fill: $ => `hsl(220, 80%, ${5 + $.i * 1.5}%)`,
+          stroke: 'none'
+        }
+      }
+    },
+    // Bioluminescent cells
+    {
+      collect: {
+        points: {
+          poisson: {
+            radius: 45,
+            bounds: { x: 20, y: 20, width: 560, height: 560 },
+            seed: 2024
+          }
+        },
+        voronoi: {
+          points: $ => $.points,
+          bounds: { x: 0, y: 0, width: 600, height: 600 },
+          polygon: {
+            points: $ => $.vertices,
+            fill: $ => `hsla(${160 + Math.sin($.i * 0.3) * 40}, 80%, ${30 + Math.sin($.i * 0.5) * 15}%, 0.3)`,
+            stroke: $ => `hsla(${180 + $.i * 3}, 100%, 60%, 0.6)`,
+            strokeWidth: 2,
+            noise: { scale: 0.005, amplitude: 5, seed: $ => $.i * 7 }
+          }
+        }
+      }
+    },
+    // Glowing particles
+    {
+      random: {
+        count: 100,
+        bounds: { x: 0, y: 0, width: 600, height: 600 },
+        seed: 555,
+        circle: {
+          cx: $ => $.x,
+          cy: $ => $.y,
+          r: $ => 2 + $.t * 4,
+          fill: $ => `hsla(${170 + $.t * 50}, 100%, 70%, ${0.3 + $.t * 0.5})`,
+          stroke: 'none'
+        }
+      }
+    }
+  ]
+};
+
+output('bioluminescent-ocean', bioluminescentOcean);
+
+// Dynamic Flow Field - Strokes with varying width for motion effect
+const dynamicFlowField: SvgDef = {
+  size: [800, 600],
+
+  group: [
+    // Dark gradient background
+    {
+      for: {
+        i: 0,
+        to: 15,
+        let: {
+          y: $ => $.i * 40,
+          h: 40
+        },
+        rect: {
+          x: 0,
+          y: $ => $.y,
+          width: 800,
+          height: $ => $.h + 1,
+          fill: $ => `hsl(${240 - $.i * 2}, 30%, ${8 + $.i * 0.5}%)`,
+          stroke: 'none'
+        }
+      }
+    },
+    // Flow lines - multiple layers with different starting positions
+    // Layer 1 - Main flow
+    {
+      grid: {
+        cols: 20,
+        rows: 12,
+        cellWidth: 40,
+        cellHeight: 50,
+        x: 0,
+        y: 0,
+        path: {
+          for: {
+            i: 0,
+            to: 30,
+            let: {
+              // Flow direction based on noise-like pattern
+              angle: $ => Math.sin($.x * 0.01 + $.i * 0.1) * 0.5 + Math.cos($.y * 0.015) * 0.3,
+              px: $ => $.x + $.i * 8 * Math.cos($.angle + $.row * 0.2),
+              py: $ => $.y + $.i * 4 * Math.sin($.angle + $.col * 0.15) + $.i * 2
+            },
+            point: [$ => $.px, $ => $.py]
+          },
+          // Stroke width varies along the path for motion effect
+          strokeWidth: $ => 1 + Math.sin($.t * Math.PI) * 3,
+          stroke: $ => `hsla(${200 + $.col * 8 + $.row * 3}, 80%, ${55 + $.t * 20}%, ${0.3 + $.t * 0.4})`,
+          fill: 'none',
+          smooth: { strength: 0.5, iterations: 2 }
+        }
+      }
+    },
+    // Layer 2 - Accent streaks (faster, thinner)
+    {
+      for: {
+        i: 0,
+        to: 25,
+        let: {
+          startX: $ => 50 + $.i * 30,
+          startY: $ => 100 + Math.sin($.i * 0.8) * 200
+        },
+        path: {
+          for: {
+            i: 0,
+            to: 40,
+            let: {
+              t: $ => $.i / 39,
+              angle: $ => Math.sin($.startX * 0.02 + $.t * 2) * 0.4,
+              speed: $ => 10 + $.t * 5
+            },
+            point: [
+              $ => $.startX + $.i * $.speed * Math.cos($.angle),
+              $ => $.startY + $.i * 3 + Math.sin($.i * 0.3) * 20
+            ]
+          },
+          strokeWidth: $ => 0.5 + Math.sin($.t * Math.PI) * 2,
+          stroke: $ => `hsla(${180 + $.i * 4}, 100%, 70%, ${0.2 + Math.sin($.t * Math.PI) * 0.5})`,
+          fill: 'none',
+          subdivide: { iterations: 1, algorithm: 'chaikin' }
+        }
+      }
+    },
+    // Layer 3 - Particle dots along flow
+    {
+      random: {
+        count: 150,
+        bounds: { x: 0, y: 0, width: 800, height: 600 },
+        seed: 2024,
+        circle: {
+          cx: $ => $.x,
+          cy: $ => $.y,
+          r: $ => 1 + $.t * 3,
+          fill: $ => `hsla(${190 + $.t * 40}, 100%, ${70 + $.t * 20}%, ${0.3 + $.t * 0.5})`,
+          stroke: 'none'
+        }
+      }
+    },
+    // Bright accent particles
+    {
+      random: {
+        count: 30,
+        bounds: { x: 100, y: 100, width: 600, height: 400 },
+        seed: 999,
+        circle: {
+          cx: $ => $.x,
+          cy: $ => $.y,
+          r: $ => 2 + $.t * 4,
+          fill: 'white',
+          stroke: $ => `hsla(180, 100%, 80%, ${0.5 + $.t * 0.3})`,
+          strokeWidth: 2
+        }
+      }
+    }
+  ]
+};
+
+output('dynamic-flow-field', dynamicFlowField);
