@@ -908,3 +908,48 @@ const triangleTiles: SvgDef = {
 };
 
 output('tile-triangle', triangleTiles);
+
+// Circle packing examples
+const packCircle: SvgDef = {
+  size: [400, 400],
+
+  pack: {
+    bounds: { type: 'circle', cx: 200, cy: 200, r: 180 },
+    count: 100,
+    minRadius: 5,
+    maxRadius: 30,
+    padding: 2,
+    circle: {
+      cx: $ => $.x,
+      cy: $ => $.y,
+      r: $ => $.r,
+      fill: ($: any) => `hsl(${$.i * 3.6}, 70%, 60%)`,
+      stroke: 'white',
+      strokeWidth: 1
+    }
+  }
+};
+
+output('pack-circle', packCircle);
+
+const packRect: SvgDef = {
+  size: [500, 300],
+
+  pack: {
+    bounds: { type: 'rect', x: 20, y: 20, width: 460, height: 260 },
+    count: 80,
+    minRadius: 8,
+    maxRadius: 40,
+    padding: 3,
+    circle: {
+      cx: $ => $.x,
+      cy: $ => $.y,
+      r: $ => $.r,
+      fill: ($: any) => `hsl(${200 + $.r * 3}, 60%, ${50 + $.r}%)`,
+      stroke: 'rgba(255,255,255,0.5)',
+      strokeWidth: 2
+    }
+  }
+};
+
+output('pack-rect', packRect);

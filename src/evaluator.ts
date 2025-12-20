@@ -2,7 +2,7 @@ import type {
   SvgDef, LetBlock, PathData, CircleData, RectData, LineData, PolylineData, PolygonData, GroupData,
   ForIterator, GridIterator, SpiralIterator, LissajousIterator, RoseIterator, ParametricIterator,
   SuperformulaIterator, EpitrochoidIterator, HypotrochoidIterator, FlowfieldIterator, AttractorIterator,
-  FractalIterator, VoronoiIterator, DelaunayIterator, TileIterator,
+  FractalIterator, VoronoiIterator, DelaunayIterator, TileIterator, PackIterator,
   ShapeOutput, ShapeIteratorProps, Scope
 } from './types.js';
 
@@ -1191,6 +1191,107 @@ function* iterateTile(data: TileIterator, parentScope: Record<string, ScopeValue
   }
 }
 
+/** Pack circles within a bounding shape using front-chain algorithm */
+function* iteratePack(data: PackIterator, parentScope: Record<string, ScopeValue>): Generator<IteratorStep> {
+  const count = evalExpr(data.count, parentScope);
+  const minRadius = data.minRadius ? evalExpr(data.minRadius, parentScope) : 5;
+  const maxRadius = data.maxRadius ? evalExpr(data.maxRadius, parentScope) : 20;
+  const padding = data.padding ? evalExpr(data.padding, parentScope) : 2;
+
+  // Get bounds
+  let boundsType: 'circle' | 'rect';
+  let boundsCx: number, boundsCy: number, boundsR: number;
+  let boundsX: number, boundsY: number, boundsW: number, boundsH: number;
+
+  if (data.bounds.type === 'circle') {
+    boundsType = 'circle';
+    boundsCx = evalExpr(data.bounds.cx, parentScope);
+    boundsCy = evalExpr(data.bounds.cy, parentScope);
+    boundsR = evalExpr(data.bounds.r, parentScope);
+    boundsX = boundsCx - boundsR;
+    boundsY = boundsCy - boundsR;
+    boundsW = boundsR * 2;
+    boundsH = boundsR * 2;
+  } else {
+    boundsType = 'rect';
+    boundsX = evalExpr(data.bounds.x, parentScope);
+    boundsY = evalExpr(data.bounds.y, parentScope);
+    boundsW = evalExpr(data.bounds.width, parentScope);
+    boundsH = evalExpr(data.bounds.height, parentScope);
+    boundsCx = boundsX + boundsW / 2;
+    boundsCy = boundsY + boundsH / 2;
+    boundsR = Math.min(boundsW, boundsH) / 2;
+  }
+
+  // Check if circle fits within bounds
+  function fitsInBounds(x: number, y: number, r: number): boolean {
+    if (boundsType === 'circle') {
+      const dist = Math.sqrt((x - boundsCx) ** 2 + (y - boundsCy) ** 2);
+      return dist + r <= boundsR;
+    } else {
+      return x - r >= boundsX && x + r <= boundsX + boundsW &&
+             y - r >= boundsY && y + r <= boundsY + boundsH;
+    }
+  }
+
+  // Check if circle overlaps with existing circles
+  function overlaps(x: number, y: number, r: number, circles: { x: number; y: number; r: number }[]): boolean {
+    for (const c of circles) {
+      const dist = Math.sqrt((x - c.x) ** 2 + (y - c.y) ** 2);
+      if (dist < r + c.r + padding) return true;
+    }
+    return false;
+  }
+
+  const circles: { x: number; y: number; r: number }[] = [];
+  let attempts = 0;
+  const maxAttempts = count * 500;
+
+  // Simple random placement with collision detection
+  while (circles.length < count && attempts < maxAttempts) {
+    attempts++;
+
+    // Random position and radius
+    const r = minRadius + Math.random() * (maxRadius - minRadius);
+    let x: number, y: number;
+
+    if (boundsType === 'circle') {
+      // Random point in circle
+      const angle = Math.random() * Math.PI * 2;
+      const dist = Math.random() * (boundsR - r);
+      x = boundsCx + Math.cos(angle) * dist;
+      y = boundsCy + Math.sin(angle) * dist;
+    } else {
+      // Random point in rect
+      x = boundsX + r + Math.random() * (boundsW - r * 2);
+      y = boundsY + r + Math.random() * (boundsH - r * 2);
+    }
+
+    if (fitsInBounds(x, y, r) && !overlaps(x, y, r, circles)) {
+      circles.push({ x, y, r });
+    }
+  }
+
+  // Sort by size (largest first) for nicer output
+  circles.sort((a, b) => b.r - a.r);
+
+  // Yield circles
+  for (let i = 0; i < circles.length; i++) {
+    const c = circles[i];
+    const t = circles.length > 1 ? i / (circles.length - 1) : 0;
+
+    const stepScope = {
+      x: c.x,
+      y: c.y,
+      r: c.r,
+      t,
+      i
+    };
+    const innerScope = data.let ? createScope(data.let as AnyLetBlock, { ...parentScope, ...stepScope }) : stepScope;
+    yield { ...stepScope, ...innerScope };
+  }
+}
+
 /** Get iterator from point-based shape data */
 function getPointIterator(data: PathData | PolylineData | PolygonData, scope: Record<string, ScopeValue>): Generator<IteratorStep> | null {
   if (data.for) return iterateFor(data.for, scope);
@@ -1239,8 +1340,8 @@ function getShapeIterators(data: ShapeIteratorProps, scope: Record<string, Scope
   if (data.voronoi) result.push({ iterator: iterateVoronoi(data.voronoi, scope), output: data.voronoi as AnyShapeOutput });
   if (data.delaunay) result.push({ iterator: iterateDelaunay(data.delaunay, scope), output: data.delaunay as AnyShapeOutput });
   if (data.tile) result.push({ iterator: iterateTile(data.tile, scope), output: data.tile as AnyShapeOutput });
+  if (data.pack) result.push({ iterator: iteratePack(data.pack, scope), output: data.pack as AnyShapeOutput });
   // Not yet implemented
-  if (data.pack) throw new Error('PackIterator not yet implemented');
   if (data.distribute) throw new Error('DistributeIterator not yet implemented');
   return result;
 }
