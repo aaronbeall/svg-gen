@@ -603,3 +603,99 @@ const flowfieldTurbulent: SvgDef = {
 };
 
 output('flowfield-turbulent', flowfieldTurbulent);
+
+// Attractor examples - strange attractors
+const lorenzAttractor: SvgDef = {
+  size: [500, 400],
+  path: {
+    attractor: {
+      type: 'lorenz',
+      cx: 250,
+      cy: 280,
+      scale: 8,
+      iterations: 10000,
+      dt: 0.005
+    },
+    fill: 'none',
+    stroke: 'steelblue',
+    strokeWidth: 0.5
+  }
+};
+
+output('attractor-lorenz', lorenzAttractor);
+
+const rosslerAttractor: SvgDef = {
+  size: [400, 400],
+  path: {
+    attractor: {
+      type: 'rossler',
+      cx: 200,
+      cy: 200,
+      scale: 15,
+      iterations: 8000,
+      dt: 0.02
+    },
+    fill: 'none',
+    stroke: 'crimson',
+    strokeWidth: 0.5
+  }
+};
+
+output('attractor-rossler', rosslerAttractor);
+
+const thomasAttractor: SvgDef = {
+  size: [400, 400],
+  path: {
+    attractor: {
+      type: 'thomas',
+      cx: 200,
+      cy: 200,
+      scale: 60,
+      iterations: 15000,
+      dt: 0.1
+    },
+    fill: 'none',
+    stroke: 'darkgreen',
+    strokeWidth: 0.4
+  }
+};
+
+output('attractor-thomas', thomasAttractor);
+
+const aizawaAttractor: SvgDef = {
+  size: [400, 400],
+  path: {
+    attractor: {
+      type: 'aizawa',
+      cx: 200,
+      cy: 200,
+      scale: 100,
+      iterations: 10000,
+      dt: 0.01
+    },
+    fill: 'none',
+    stroke: 'purple',
+    strokeWidth: 0.5
+  }
+};
+
+output('attractor-aizawa', aizawaAttractor);
+
+const halvorsenAttractor: SvgDef = {
+  size: [400, 400],
+  path: {
+    attractor: {
+      type: 'halvorsen',
+      cx: 200,
+      cy: 200,
+      scale: 20,
+      iterations: 10000,
+      dt: 0.005
+    },
+    fill: 'none',
+    stroke: 'darkorange',
+    strokeWidth: 0.5
+  }
+};
+
+output('attractor-halvorsen', halvorsenAttractor);

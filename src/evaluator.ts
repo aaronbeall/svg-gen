@@ -1,7 +1,7 @@
 import type {
   SvgDef, LetBlock, PathData, CircleData, RectData, LineData, PolylineData, PolygonData, GroupData,
   ForIterator, GridIterator, SpiralIterator, LissajousIterator, RoseIterator, ParametricIterator,
-  SuperformulaIterator, EpitrochoidIterator, HypotrochoidIterator, FlowfieldIterator,
+  SuperformulaIterator, EpitrochoidIterator, HypotrochoidIterator, FlowfieldIterator, AttractorIterator,
   ShapeOutput, ShapeIteratorProps, Scope
 } from './types.js';
 
@@ -600,6 +600,112 @@ function* iterateFlowfield(data: FlowfieldIterator, parentScope: Record<string, 
   }
 }
 
+/** Iterate a strange attractor, yielding scope steps with x, y, z, t, i */
+function* iterateAttractor(data: AttractorIterator, parentScope: Record<string, ScopeValue>): Generator<IteratorStep> {
+  const type = evalExpr(data.type, parentScope);
+  const cx = evalExpr(data.cx, parentScope);
+  const cy = evalExpr(data.cy, parentScope);
+  const scale = data.scale ? evalExpr(data.scale, parentScope) : 1;
+  const iterations = evalExpr(data.iterations, parentScope);
+  const dt = data.dt ? evalExpr(data.dt, parentScope) : 0.01;
+  
+  // Get attractor-specific parameters with defaults
+  const params: Record<string, number> = {};
+  if (data.params) {
+    for (const [key, value] of Object.entries(data.params)) {
+      params[key] = evalExpr(value, parentScope);
+    }
+  }
+
+  // Initial conditions (slightly off-center for interesting behavior)
+  let x = 0.1, y = 0, z = 0;
+
+  // Attractor step functions
+  const attractors: Record<string, (x: number, y: number, z: number) => [number, number, number]> = {
+    lorenz: (x, y, z) => {
+      const sigma = params.sigma ?? 10;
+      const rho = params.rho ?? 28;
+      const beta = params.beta ?? 8 / 3;
+      return [
+        sigma * (y - x),
+        x * (rho - z) - y,
+        x * y - beta * z
+      ];
+    },
+    rossler: (x, y, z) => {
+      const a = params.a ?? 0.2;
+      const b = params.b ?? 0.2;
+      const c = params.c ?? 5.7;
+      return [
+        -y - z,
+        x + a * y,
+        b + z * (x - c)
+      ];
+    },
+    thomas: (x, y, z) => {
+      const b = params.b ?? 0.208186;
+      return [
+        Math.sin(y) - b * x,
+        Math.sin(z) - b * y,
+        Math.sin(x) - b * z
+      ];
+    },
+    aizawa: (x, y, z) => {
+      const a = params.a ?? 0.95;
+      const b = params.b ?? 0.7;
+      const c = params.c ?? 0.6;
+      const d = params.d ?? 3.5;
+      const e = params.e ?? 0.25;
+      const f = params.f ?? 0.1;
+      return [
+        (z - b) * x - d * y,
+        d * x + (z - b) * y,
+        c + a * z - (z * z * z) / 3 - (x * x + y * y) * (1 + e * z) + f * z * x * x * x
+      ];
+    },
+    halvorsen: (x, y, z) => {
+      const a = params.a ?? 1.89;
+      return [
+        -a * x - 4 * y - 4 * z - y * y,
+        -a * y - 4 * z - 4 * x - z * z,
+        -a * z - 4 * x - 4 * y - x * x
+      ];
+    }
+  };
+
+  const step = attractors[type];
+  if (!step) throw new Error(`Unknown attractor type: ${type}`);
+
+  // Skip initial transient
+  for (let i = 0; i < 1000; i++) {
+    const [dx, dy, dz] = step(x, y, z);
+    x += dx * dt;
+    y += dy * dt;
+    z += dz * dt;
+  }
+
+  // Generate points
+  for (let i = 0; i < iterations; i++) {
+    const t = iterations > 1 ? i / (iterations - 1) : 0;
+    
+    const stepScope = {
+      x: cx + x * scale,
+      y: cy + y * scale,
+      z,
+      t,
+      i
+    };
+    const innerScope = data.let ? createScope(data.let as AnyLetBlock, { ...parentScope, ...stepScope }) : stepScope;
+    yield { ...stepScope, ...innerScope };
+
+    // Advance attractor
+    const [dx, dy, dz] = step(x, y, z);
+    x += dx * dt;
+    y += dy * dt;
+    z += dz * dt;
+  }
+}
+
 /** Get iterator from point-based shape data */
 function getPointIterator(data: PathData | PolylineData | PolygonData, scope: Record<string, ScopeValue>): Generator<IteratorStep> | null {
   if (data.for) return iterateFor(data.for, scope);
@@ -612,9 +718,9 @@ function getPointIterator(data: PathData | PolylineData | PolygonData, scope: Re
   if (data.epitrochoid) return iterateEpitrochoid(data.epitrochoid, scope);
   if (data.hypotrochoid) return iterateHypotrochoid(data.hypotrochoid, scope);
   if (data.flowfield) return iterateFlowfield(data.flowfield, scope);
+  if (data.attractor) return iterateAttractor(data.attractor, scope);
   // Not yet implemented
   if (data.fractal) throw new Error('FractalIterator not yet implemented');
-  if (data.attractor) throw new Error('AttractorIterator not yet implemented');
   return null;
 }
 
@@ -644,9 +750,9 @@ function getShapeIterators(data: ShapeIteratorProps, scope: Record<string, Scope
   if (data.epitrochoid) result.push({ iterator: iterateEpitrochoid(data.epitrochoid, scope), output: data.epitrochoid as AnyShapeOutput });
   if (data.hypotrochoid) result.push({ iterator: iterateHypotrochoid(data.hypotrochoid, scope), output: data.hypotrochoid as AnyShapeOutput });
   if (data.flowfield) result.push({ iterator: iterateFlowfield(data.flowfield, scope), output: data.flowfield as AnyShapeOutput });
+  if (data.attractor) result.push({ iterator: iterateAttractor(data.attractor, scope), output: data.attractor as AnyShapeOutput });
   // Not yet implemented
   if (data.fractal) throw new Error('FractalIterator not yet implemented');
-  if (data.attractor) throw new Error('AttractorIterator not yet implemented');
   if (data.voronoi) throw new Error('VoronoiIterator not yet implemented');
   if (data.delaunay) throw new Error('DelaunayIterator not yet implemented');
   if (data.tile) throw new Error('TileIterator not yet implemented');
