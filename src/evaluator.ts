@@ -1,6 +1,7 @@
 import type {
   SvgDef, LetBlock, PathData, CircleData, RectData, LineData, PolylineData, PolygonData, GroupData,
-  ForIterator, GridIterator, SpiralIterator, LissajousIterator, RoseIterator, ParametricIterator, SuperformulaIterator,
+  ForIterator, GridIterator, SpiralIterator, LissajousIterator, RoseIterator, ParametricIterator,
+  SuperformulaIterator, EpitrochoidIterator, HypotrochoidIterator,
   ShapeOutput, ShapeIteratorProps, Scope
 } from './types.js';
 
@@ -481,6 +482,69 @@ function* iterateSuperformula(data: SuperformulaIterator, parentScope: Record<st
   }
 }
 
+/** Iterate an epitrochoid (spirograph outer), yielding scope steps with x, y, theta, t, i */
+function* iterateEpitrochoid(data: EpitrochoidIterator, parentScope: Record<string, ScopeValue>): Generator<IteratorStep> {
+  const cx = evalExpr(data.cx, parentScope);
+  const cy = evalExpr(data.cy, parentScope);
+  const R = evalExpr(data.R, parentScope);
+  const r = evalExpr(data.r, parentScope);
+  const d = evalExpr(data.d, parentScope);
+  const revolutions = data.revolutions ? evalExpr(data.revolutions, parentScope) : computeRevolutions(R, r);
+  const samples = data.samples ? evalExpr(data.samples, parentScope) : Math.max(200, revolutions * 100);
+
+  const totalAngle = revolutions * 2 * Math.PI;
+
+  for (let i = 0; i <= samples; i++) {
+    const t = i / samples;
+    const theta = t * totalAngle;
+
+    // Epitrochoid: point on circle rolling outside fixed circle
+    // x = (R + r) * cos(theta) - d * cos((R + r) / r * theta)
+    // y = (R + r) * sin(theta) - d * sin((R + r) / r * theta)
+    const x = cx + (R + r) * Math.cos(theta) - d * Math.cos(((R + r) / r) * theta);
+    const y = cy + (R + r) * Math.sin(theta) - d * Math.sin(((R + r) / r) * theta);
+
+    const stepScope = { x, y, theta, t, i };
+    const innerScope = data.let ? createScope(data.let as AnyLetBlock, { ...parentScope, ...stepScope }) : stepScope;
+    yield { ...stepScope, ...innerScope };
+  }
+}
+
+/** Iterate a hypotrochoid (spirograph inner), yielding scope steps with x, y, theta, t, i */
+function* iterateHypotrochoid(data: HypotrochoidIterator, parentScope: Record<string, ScopeValue>): Generator<IteratorStep> {
+  const cx = evalExpr(data.cx, parentScope);
+  const cy = evalExpr(data.cy, parentScope);
+  const R = evalExpr(data.R, parentScope);
+  const r = evalExpr(data.r, parentScope);
+  const d = evalExpr(data.d, parentScope);
+  const revolutions = data.revolutions ? evalExpr(data.revolutions, parentScope) : computeRevolutions(R, r);
+  const samples = data.samples ? evalExpr(data.samples, parentScope) : Math.max(200, revolutions * 100);
+
+  const totalAngle = revolutions * 2 * Math.PI;
+
+  for (let i = 0; i <= samples; i++) {
+    const t = i / samples;
+    const theta = t * totalAngle;
+
+    // Hypotrochoid: point on circle rolling inside fixed circle
+    // x = (R - r) * cos(theta) + d * cos((R - r) / r * theta)
+    // y = (R - r) * sin(theta) - d * sin((R - r) / r * theta)
+    const x = cx + (R - r) * Math.cos(theta) + d * Math.cos(((R - r) / r) * theta);
+    const y = cy + (R - r) * Math.sin(theta) - d * Math.sin(((R - r) / r) * theta);
+
+    const stepScope = { x, y, theta, t, i };
+    const innerScope = data.let ? createScope(data.let as AnyLetBlock, { ...parentScope, ...stepScope }) : stepScope;
+    yield { ...stepScope, ...innerScope };
+  }
+}
+
+/** Compute number of revolutions needed to complete a spirograph pattern */
+function computeRevolutions(R: number, r: number): number {
+  // Pattern completes after r / gcd(R, r) revolutions
+  const gcd = (a: number, b: number): number => b === 0 ? a : gcd(b, a % b);
+  return r / gcd(Math.round(R), Math.round(r));
+}
+
 /** Get iterator from point-based shape data */
 function getPointIterator(data: PathData | PolylineData | PolygonData, scope: Record<string, ScopeValue>): Generator<IteratorStep> | null {
   if (data.for) return iterateFor(data.for, scope);
@@ -490,9 +554,9 @@ function getPointIterator(data: PathData | PolylineData | PolygonData, scope: Re
   if (data.rose) return iterateRose(data.rose, scope);
   if (data.parametric) return iterateParametric(data.parametric, scope);
   if (data.superformula) return iterateSuperformula(data.superformula, scope);
+  if (data.epitrochoid) return iterateEpitrochoid(data.epitrochoid, scope);
+  if (data.hypotrochoid) return iterateHypotrochoid(data.hypotrochoid, scope);
   // Not yet implemented
-  if (data.epitrochoid) throw new Error('EpitrochoidIterator not yet implemented');
-  if (data.hypotrochoid) throw new Error('HypotrochoidIterator not yet implemented');
   if (data.fractal) throw new Error('FractalIterator not yet implemented');
   if (data.attractor) throw new Error('AttractorIterator not yet implemented');
   if (data.flowfield) throw new Error('FlowfieldIterator not yet implemented');
@@ -522,9 +586,9 @@ function getShapeIterators(data: ShapeIteratorProps, scope: Record<string, Scope
   if (data.rose) result.push({ iterator: iterateRose(data.rose, scope), output: data.rose as AnyShapeOutput });
   if (data.parametric) result.push({ iterator: iterateParametric(data.parametric, scope), output: data.parametric as AnyShapeOutput });
   if (data.superformula) result.push({ iterator: iterateSuperformula(data.superformula, scope), output: data.superformula as AnyShapeOutput });
+  if (data.epitrochoid) result.push({ iterator: iterateEpitrochoid(data.epitrochoid, scope), output: data.epitrochoid as AnyShapeOutput });
+  if (data.hypotrochoid) result.push({ iterator: iterateHypotrochoid(data.hypotrochoid, scope), output: data.hypotrochoid as AnyShapeOutput });
   // Not yet implemented
-  if (data.epitrochoid) throw new Error('EpitrochoidIterator not yet implemented');
-  if (data.hypotrochoid) throw new Error('HypotrochoidIterator not yet implemented');
   if (data.fractal) throw new Error('FractalIterator not yet implemented');
   if (data.attractor) throw new Error('AttractorIterator not yet implemented');
   if (data.flowfield) throw new Error('FlowfieldIterator not yet implemented');

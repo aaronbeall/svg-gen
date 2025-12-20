@@ -383,3 +383,41 @@ const superformulaExample: SvgDef = {
 };
 
 output('superformula', superformulaExample);
+
+// Spirograph examples - epitrochoid and hypotrochoid
+const spirographExample: SvgDef = {
+  size: [600, 300],
+
+  path: [
+    // Epitrochoid - circle rolling outside (like a spirograph with outer gear)
+    {
+      epitrochoid: {
+        cx: 150,
+        cy: 150,
+        R: 60,   // Fixed circle radius
+        r: 20,   // Rolling circle radius
+        d: 30    // Pen distance from rolling circle center
+      },
+      close: true,
+      fill: 'none',
+      stroke: 'crimson',
+      strokeWidth: 1.5
+    },
+    // Hypotrochoid - circle rolling inside (classic spirograph)
+    {
+      hypotrochoid: {
+        cx: 450,
+        cy: 150,
+        R: 100,  // Fixed circle radius
+        r: 40,   // Rolling circle radius
+        d: 30    // Pen distance from rolling circle center
+      },
+      close: true,
+      fill: 'none',
+      stroke: 'navy',
+      strokeWidth: 1.5
+    }
+  ]
+};
+
+output('spirograph', spirographExample);
