@@ -2,7 +2,7 @@ import type {
   SvgDef, LetBlock, PathData, CircleData, RectData, LineData, PolylineData, PolygonData, GroupData,
   ForIterator, GridIterator, SpiralIterator, LissajousIterator, RoseIterator, ParametricIterator,
   SuperformulaIterator, EpitrochoidIterator, HypotrochoidIterator, FlowfieldIterator, AttractorIterator,
-  FractalIterator, VoronoiIterator,
+  FractalIterator, VoronoiIterator, DelaunayIterator, TileIterator,
   ShapeOutput, ShapeIteratorProps, Scope
 } from './types.js';
 
@@ -969,6 +969,228 @@ function* iterateVoronoi(data: VoronoiIterator, parentScope: Record<string, Scop
   }
 }
 
+/** Compute Delaunay triangulation using Bowyer-Watson algorithm */
+function computeDelaunay(points: { x: number; y: number }[]): { x1: number; y1: number; x2: number; y2: number; x3: number; y3: number }[] {
+  if (points.length < 3) return [];
+
+  // Find bounding box
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of points) {
+    minX = Math.min(minX, p.x);
+    minY = Math.min(minY, p.y);
+    maxX = Math.max(maxX, p.x);
+    maxY = Math.max(maxY, p.y);
+  }
+
+  const dx = maxX - minX;
+  const dy = maxY - minY;
+  const deltaMax = Math.max(dx, dy) * 2;
+
+  // Create super-triangle
+  const p1 = { x: minX - deltaMax, y: minY - deltaMax };
+  const p2 = { x: minX + deltaMax * 2, y: minY - deltaMax };
+  const p3 = { x: minX + dx / 2, y: maxY + deltaMax };
+
+  interface Triangle { p1: { x: number; y: number }; p2: { x: number; y: number }; p3: { x: number; y: number } }
+
+  function circumcircleContains(tri: Triangle, p: { x: number; y: number }): boolean {
+    const ax = tri.p1.x, ay = tri.p1.y;
+    const bx = tri.p2.x, by = tri.p2.y;
+    const cx = tri.p3.x, cy = tri.p3.y;
+
+    const d = 2 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by));
+    if (Math.abs(d) < 1e-10) return false;
+
+    const ux = ((ax * ax + ay * ay) * (by - cy) + (bx * bx + by * by) * (cy - ay) + (cx * cx + cy * cy) * (ay - by)) / d;
+    const uy = ((ax * ax + ay * ay) * (cx - bx) + (bx * bx + by * by) * (ax - cx) + (cx * cx + cy * cy) * (bx - ax)) / d;
+    const r2 = (ax - ux) * (ax - ux) + (ay - uy) * (ay - uy);
+
+    const dist2 = (p.x - ux) * (p.x - ux) + (p.y - uy) * (p.y - uy);
+    return dist2 <= r2;
+  }
+
+  let triangles: Triangle[] = [{ p1, p2, p3 }];
+
+  // Add points one at a time
+  for (const point of points) {
+    const badTriangles: Triangle[] = [];
+    
+    for (const tri of triangles) {
+      if (circumcircleContains(tri, point)) {
+        badTriangles.push(tri);
+      }
+    }
+
+    // Find boundary polygon
+    const polygon: { p1: { x: number; y: number }; p2: { x: number; y: number } }[] = [];
+    for (const tri of badTriangles) {
+      const edges = [
+        { p1: tri.p1, p2: tri.p2 },
+        { p1: tri.p2, p2: tri.p3 },
+        { p1: tri.p3, p2: tri.p1 }
+      ];
+      for (const edge of edges) {
+        let shared = false;
+        for (const other of badTriangles) {
+          if (other === tri) continue;
+          const otherEdges = [
+            [other.p1, other.p2], [other.p2, other.p3], [other.p3, other.p1]
+          ];
+          for (const [oe1, oe2] of otherEdges) {
+            if ((edge.p1 === oe1 && edge.p2 === oe2) || (edge.p1 === oe2 && edge.p2 === oe1)) {
+              shared = true;
+              break;
+            }
+          }
+          if (shared) break;
+        }
+        if (!shared) polygon.push(edge);
+      }
+    }
+
+    // Remove bad triangles
+    triangles = triangles.filter(t => !badTriangles.includes(t));
+
+    // Create new triangles
+    for (const edge of polygon) {
+      triangles.push({ p1: edge.p1, p2: edge.p2, p3: point });
+    }
+  }
+
+  // Remove triangles that share vertices with super-triangle
+  triangles = triangles.filter(tri => 
+    tri.p1 !== p1 && tri.p1 !== p2 && tri.p1 !== p3 &&
+    tri.p2 !== p1 && tri.p2 !== p2 && tri.p2 !== p3 &&
+    tri.p3 !== p1 && tri.p3 !== p2 && tri.p3 !== p3
+  );
+
+  return triangles.map(tri => ({
+    x1: tri.p1.x, y1: tri.p1.y,
+    x2: tri.p2.x, y2: tri.p2.y,
+    x3: tri.p3.x, y3: tri.p3.y
+  }));
+}
+
+/** Iterate Delaunay triangles, yielding scope steps with x1,y1,x2,y2,x3,y3, cx,cy, i */
+function* iterateDelaunay(data: DelaunayIterator, parentScope: Record<string, ScopeValue>): Generator<IteratorStep> {
+  const points = data.points.map(([xExpr, yExpr]) => ({
+    x: evalExpr(xExpr, parentScope),
+    y: evalExpr(yExpr, parentScope)
+  }));
+
+  const triangles = computeDelaunay(points);
+
+  for (let i = 0; i < triangles.length; i++) {
+    const tri = triangles[i];
+    const t = triangles.length > 1 ? i / (triangles.length - 1) : 0;
+    const cx = (tri.x1 + tri.x2 + tri.x3) / 3;
+    const cy = (tri.y1 + tri.y2 + tri.y3) / 3;
+
+    const stepScope = {
+      x: cx,
+      y: cy,
+      x1: tri.x1, y1: tri.y1,
+      x2: tri.x2, y2: tri.y2,
+      x3: tri.x3, y3: tri.y3,
+      cx, cy,
+      vertices: [[tri.x1, tri.y1], [tri.x2, tri.y2], [tri.x3, tri.y3]] as [number, number][],
+      t,
+      i
+    };
+    const innerScope = data.let ? createScope(data.let as AnyLetBlock, { ...parentScope, ...stepScope }) : stepScope;
+    yield { ...stepScope, ...innerScope };
+  }
+}
+
+/** Iterate tiles in a regular pattern, yielding scope steps with x, y, vertices, row, col, i */
+function* iterateTile(data: TileIterator, parentScope: Record<string, ScopeValue>): Generator<IteratorStep> {
+  const type = evalExpr(data.type, parentScope);
+  const size = evalExpr(data.size, parentScope);
+  const cols = evalExpr(data.cols, parentScope);
+  const rows = evalExpr(data.rows, parentScope);
+  const offsetX = data.x ? evalExpr(data.x, parentScope) : 0;
+  const offsetY = data.y ? evalExpr(data.y, parentScope) : 0;
+
+  let i = 0;
+  const total = cols * rows;
+
+  // Generate tile vertices based on type
+  function getSquareVertices(cx: number, cy: number, s: number): [number, number][] {
+    const h = s / 2;
+    return [[cx - h, cy - h], [cx + h, cy - h], [cx + h, cy + h], [cx - h, cy + h]];
+  }
+
+  function getHexVertices(cx: number, cy: number, s: number): [number, number][] {
+    const vertices: [number, number][] = [];
+    for (let a = 0; a < 6; a++) {
+      const angle = (a * 60 - 30) * Math.PI / 180;
+      vertices.push([cx + s * Math.cos(angle), cy + s * Math.sin(angle)]);
+    }
+    return vertices;
+  }
+
+  function getTriangleVertices(cx: number, cy: number, s: number, pointUp: boolean): [number, number][] {
+    const h = s * Math.sqrt(3) / 2;
+    if (pointUp) {
+      return [[cx, cy - h * 2/3], [cx - s/2, cy + h/3], [cx + s/2, cy + h/3]];
+    } else {
+      return [[cx, cy + h * 2/3], [cx - s/2, cy - h/3], [cx + s/2, cy - h/3]];
+    }
+  }
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const t = total > 1 ? i / (total - 1) : 0;
+      let x: number, y: number;
+      let vertices: [number, number][];
+
+      switch (type) {
+        case 'square':
+          x = offsetX + col * size + size / 2;
+          y = offsetY + row * size + size / 2;
+          vertices = getSquareVertices(x, y, size);
+          break;
+
+        case 'hex': {
+          const hexW = size * Math.sqrt(3);
+          const hexH = size * 1.5;
+          x = offsetX + col * hexW + (row % 2 === 1 ? hexW / 2 : 0) + hexW / 2;
+          y = offsetY + row * hexH + size;
+          vertices = getHexVertices(x, y, size);
+          break;
+        }
+
+        case 'triangle': {
+          const triW = size;
+          const triH = size * Math.sqrt(3) / 2;
+          const pointUp = (row + col) % 2 === 0;
+          x = offsetX + col * (size / 2) + size / 2;
+          y = offsetY + row * triH + triH / 2;
+          vertices = getTriangleVertices(x, y, size, pointUp);
+          break;
+        }
+
+        case 'penrose':
+          // Simplified - just use rhombus for now
+          x = offsetX + col * size + size / 2;
+          y = offsetY + row * size + size / 2;
+          vertices = getSquareVertices(x, y, size);
+          break;
+
+        default:
+          x = offsetX + col * size + size / 2;
+          y = offsetY + row * size + size / 2;
+          vertices = getSquareVertices(x, y, size);
+      }
+
+      const stepScope = { x, y, vertices, row, col, t, i };
+      const innerScope = data.let ? createScope(data.let as AnyLetBlock, { ...parentScope, ...stepScope }) : stepScope;
+      yield { ...stepScope, ...innerScope };
+      i++;
+    }
+  }
+}
+
 /** Get iterator from point-based shape data */
 function getPointIterator(data: PathData | PolylineData | PolygonData, scope: Record<string, ScopeValue>): Generator<IteratorStep> | null {
   if (data.for) return iterateFor(data.for, scope);
@@ -1015,9 +1237,9 @@ function getShapeIterators(data: ShapeIteratorProps, scope: Record<string, Scope
   if (data.attractor) result.push({ iterator: iterateAttractor(data.attractor, scope), output: data.attractor as AnyShapeOutput });
   if (data.fractal) result.push({ iterator: iterateFractal(data.fractal, scope), output: data.fractal as AnyShapeOutput });
   if (data.voronoi) result.push({ iterator: iterateVoronoi(data.voronoi, scope), output: data.voronoi as AnyShapeOutput });
+  if (data.delaunay) result.push({ iterator: iterateDelaunay(data.delaunay, scope), output: data.delaunay as AnyShapeOutput });
+  if (data.tile) result.push({ iterator: iterateTile(data.tile, scope), output: data.tile as AnyShapeOutput });
   // Not yet implemented
-  if (data.delaunay) throw new Error('DelaunayIterator not yet implemented');
-  if (data.tile) throw new Error('TileIterator not yet implemented');
   if (data.pack) throw new Error('PackIterator not yet implemented');
   if (data.distribute) throw new Error('DistributeIterator not yet implemented');
   return result;

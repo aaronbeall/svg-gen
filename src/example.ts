@@ -827,3 +827,84 @@ const voronoiExample: SvgDef = {
 };
 
 output('voronoi', voronoiExample);
+
+// Delaunay triangulation example
+const delaunayExample: SvgDef = {
+  size: [400, 400],
+
+  delaunay: {
+    points: [
+      [50, 80], [120, 40], [200, 60], [280, 30], [350, 70],
+      [40, 150], [100, 180], [180, 140], [260, 160], [340, 130],
+      [60, 240], [140, 280], [220, 220], [300, 260], [370, 200],
+      [30, 320], [110, 360], [190, 340], [270, 380], [350, 330]
+    ],
+    // Draw each triangle
+    polygon: {
+      points: $ => $.vertices,
+      fill: ($: any) => `hsla(${$.i * 12}, 60%, 70%, 0.7)`,
+      stroke: 'white',
+      strokeWidth: 1
+    }
+  }
+};
+
+output('delaunay', delaunayExample);
+
+// Tile examples - different tiling patterns
+const squareTiles: SvgDef = {
+  size: [400, 400],
+
+  tile: {
+    type: 'square',
+    size: 50,
+    cols: 8,
+    rows: 8,
+    polygon: {
+      points: $ => $.vertices,
+      fill: ($: any) => ($.row + $.col) % 2 === 0 ? '#4a90d9' : '#f5f5f5',
+      stroke: '#333',
+      strokeWidth: 1
+    }
+  }
+};
+
+output('tile-square', squareTiles);
+
+const hexTiles: SvgDef = {
+  size: [450, 400],
+
+  tile: {
+    type: 'hex',
+    size: 30,
+    cols: 8,
+    rows: 8,
+    polygon: {
+      points: $ => $.vertices,
+      fill: ($: any) => `hsl(${($.row * 8 + $.col) * 5}, 60%, 70%)`,
+      stroke: 'white',
+      strokeWidth: 2
+    }
+  }
+};
+
+output('tile-hex', hexTiles);
+
+const triangleTiles: SvgDef = {
+  size: [400, 350],
+
+  tile: {
+    type: 'triangle',
+    size: 50,
+    cols: 16,
+    rows: 8,
+    polygon: {
+      points: $ => $.vertices,
+      fill: ($: any) => `hsl(${$.i * 3}, 50%, ${60 + ($.row % 2) * 20}%)`,
+      stroke: 'white',
+      strokeWidth: 1
+    }
+  }
+};
+
+output('tile-triangle', triangleTiles);
